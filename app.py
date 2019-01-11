@@ -1,7 +1,9 @@
 from flask import Flask, render_template, jsonify, request
-import serial
+from tinydb import TinyDB, Query
+import serial, json
 
 app = Flask(__name__)
+db = TinyDB('db.json')
 
 @app.route('/')
 def index():
@@ -13,19 +15,9 @@ def solid_color():
 
 @app.route('/rgbw-color')
 def rgw_color():
-    return render_template('rgbw-color.html')
-
-@app.route('/_post_solid_color/', methods=['POST'])
-def _post_solid_color():
-    color = request.form['color']
-
-    # send request.
-    ser = serial.Serial('/dev/ttyACM0', 9600)
-    ser.write(color.encode())
-    input = ser.read()
-    print ("Response: " + str(input))
-
-    return jsonify({'color': color, 'response': input})
+    swatch_query = Query()
+    swatches = db.search(swatch_query.type == 'rgbw')
+    return render_template('rgbw-color.html', swatches=swatches)
 
 @app.route('/_post_rgbw_color/', methods=['POST'])
 def _post_rgbw_color():

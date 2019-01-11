@@ -1,6 +1,8 @@
+/* global swatches */
 $( function() {
 
-    function rgbwColor() {
+    // Load color pickers, leveraging noUiSlider.
+    function rgbwColorPicker() {
         var previewElement = document.getElementById('preview');
         var sliders = document.getElementsByClassName('sliders');
         var colors = [0, 0, 0, 0];
@@ -11,9 +13,18 @@ $( function() {
                 start: 0,
                 step: 1,
                 connect: [true, false],
+                tooltips: [true],
                 range: {
                     'min': 0,
                     'max': 255
+                },
+                format: {
+                    to: function (value) {
+                        return parseInt(value);
+                    },
+                    from: function (value) {
+                        return parseInt(value);
+                    }
                 }
             });
 
@@ -33,7 +44,7 @@ $( function() {
             slider.noUiSlider.on('set', function () {
                 colors[index] = slider.noUiSlider.get();
 
-                var alpha = 1-(colors[3]/255);
+                var alpha = makeAlpha(colors[3]);
                 var previewColor = 'rgba('+colors[0]+','+colors[1]+','+colors[2]+','+alpha+')';
                 previewElement.style.background = previewColor;
                 previewElement.style.color = previewColor;
@@ -79,8 +90,28 @@ $( function() {
         }
     }
 
+    // Load swatches from server.
+    function loadSwatches() {
+        if (!Array.isArray(swatches) || !swatches.length) {
+            return;
+        }
+        var swatchContainer = document.getElementById('swatch-container');
+        swatches.forEach(function(swatch, index) {
+            var swatchDiv = document.createElement('div');
+            swatchDiv.classList.add('swatch');
+            swatchDiv.style.background = 'rgba('+swatch.r+','+swatch.g+','+swatch.b+','+makeAlpha(swatch.w)+''
+            swatchContainer.appendChild(swatchDiv);
+        });
+    }
+
+    // Convert Wite channel to alpha transparency for preview.
+    function makeAlpha(alpha) {
+        return 1-(alpha/255);
+    }
+
     $( document ).ready(function() {
-        rgbwColor();
+        loadSwatches();
+        rgbwColorPicker();
     });
 
 
