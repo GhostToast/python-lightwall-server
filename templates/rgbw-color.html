@@ -9,19 +9,26 @@
         <link rel="shortcut icon" href="/static/favicon.ico">
         <link rel="stylesheet" href="/static/bootstrap.min.css">
         <link rel="stylesheet" href="/static/nouislider.min.css">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
         <link rel="stylesheet" href="/static/style.css">
     </head>
     <body>
         <main role="main" class="container">
             <h1>RGBW Color</h1>
             <div class="ui-widget">
-              <div id="preview"></div>
-              <div class="sliders" id="red-slider"></div>
-              <div class="sliders" id="green-slider"/></div>
-              <div class="sliders" id="blue-slider"/></div>
-              <div class="sliders" id="white-slider"/></div>
+                <div id="preview-container">
+                    <div id="preview" class="text-right">
+                        <button type="button" class="btn btn-light" id="save-color">
+                            <i class="material-icons">save</i>
+                        </button>
+                    </div>
+                </div>
+                <div class="sliders" id="red-slider"></div>
+                <div class="sliders" id="green-slider"/></div>
+                <div class="sliders" id="blue-slider"/></div>
+                <div class="sliders" id="white-slider"/></div>
 
-              <div id="swatch-container"></div>
+                <div id="swatch-container"></div>
             </div>
         </main><!-- /.container -->
 

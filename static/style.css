@@ -1,10 +1,17 @@
 body {
-    margin:20px;
+    margin: 20px;
+    background: #282828;
+    color: #808080;
 }
 
 
 .sliders {
      margin: 15px;
+}
+
+#preview-container {
+    background: #FFF;
+    border-radius: .25rem;
 }
 
 #preview {
@@ -14,6 +21,7 @@ body {
     background: #000;
     border: 1px solid #FFF;
     box-shadow: 0 0 10px;
+    border-radius: .25rem;
 }    
 
 #red-slider .noUi-connect { background: #c0392b; }
@@ -27,4 +35,11 @@ body {
 
 .noUi-active .noUi-tooltip {
     display:block;
+}
+
+.swatch {
+    width: 100px;
+    height: 100px;
+    background: #000;
+    display: inline-block;
 }

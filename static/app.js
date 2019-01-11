@@ -1,11 +1,16 @@
 /* global swatches */
 $( function() {
 
+    var swatchContainer = document.getElementById('swatch-container');
+    var saveColor       = document.getElementById('save-color');
+    var previewElement  = document.getElementById('preview');
+    var colors = [0, 0, 0, 0];
+
+
+
     // Load color pickers, leveraging noUiSlider.
     function rgbwColorPicker() {
-        var previewElement = document.getElementById('preview');
         var sliders = document.getElementsByClassName('sliders');
-        var colors = [0, 0, 0, 0];
 
         [].slice.call(sliders).forEach(function (slider, index) {
 
@@ -48,17 +53,14 @@ $( function() {
                 var previewColor = 'rgba('+colors[0]+','+colors[1]+','+colors[2]+','+alpha+')';
                 previewElement.style.background = previewColor;
                 previewElement.style.color = previewColor;
+
+                colorsData = getColors();
                 
                 $.ajax({
                     url: '/_post_rgbw_color/',
                     type: 'POST',
                     dataType: 'json',
-                    data: {
-                        red: colors[0],
-                        green: colors[1],
-                        blue: colors[2],
-                        white: colors[3]
-                    },
+                    data: colorsData,
                     success: function(resp) {
                         console.log(resp);
                     }
@@ -95,13 +97,31 @@ $( function() {
         if (!Array.isArray(swatches) || !swatches.length) {
             return;
         }
-        var swatchContainer = document.getElementById('swatch-container');
-        swatches.forEach(function(swatch, index) {
-            var swatchDiv = document.createElement('div');
-            swatchDiv.classList.add('swatch');
-            swatchDiv.style.background = 'rgba('+swatch.r+','+swatch.g+','+swatch.b+','+makeAlpha(swatch.w)+''
-            swatchContainer.appendChild(swatchDiv);
+        swatches.forEach(addSwatch);
+    }
+
+    // Add new swatch.
+    function addSwatch(swatch) {
+        var swatchDiv = document.createElement('div');
+        swatchDiv.classList.add('swatch');
+        swatchDiv.style.background = 'rgba('+swatch.r+','+swatch.g+','+swatch.b+','+makeAlpha(swatch.w)+''
+        swatchContainer.appendChild(swatchDiv);
+    }
+
+    function swatchBindings() {
+        saveColor.addEventListener('click', function(e) {
+            swatch = getColors();
+            addSwatch(swatch);
         });
+    }
+
+    function getColors() {
+        return {
+            r: colors[0],
+            g: colors[1],
+            b: colors[2],
+            w: colors[3]
+        }
     }
 
     // Convert Wite channel to alpha transparency for preview.
@@ -112,6 +132,7 @@ $( function() {
     $( document ).ready(function() {
         loadSwatches();
         rgbwColorPicker();
+        swatchBindings();
     });
 
 
