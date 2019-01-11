@@ -102,10 +102,15 @@ $( function() {
 
     // Add new swatch.
     function addSwatch(swatch) {
-        var swatchDiv = document.createElement('div');
+        var swatchWrapper = document.createElement('div');
+        swatchWrapper.classList.add('swatch-wrapper');
+        
+        var swatchDiv     = document.createElement('div');
         swatchDiv.classList.add('swatch');
+        
         swatchDiv.style.background = 'rgba('+swatch.r+','+swatch.g+','+swatch.b+','+makeAlpha(swatch.w)+''
-        swatchContainer.appendChild(swatchDiv);
+        swatchWrapper.appendChild(swatchDiv)
+        swatchContainer.appendChild(swatchWrapper);
     }
 
     function swatchBindings() {

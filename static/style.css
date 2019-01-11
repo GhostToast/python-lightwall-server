@@ -37,6 +37,13 @@ body {
     display:block;
 }
 
+.swatch-wrapper {
+    width:100px;
+    height:100px;
+    background: #FFF;
+    display: inline-block;
+}
+
 .swatch {
     width: 100px;
     height: 100px;

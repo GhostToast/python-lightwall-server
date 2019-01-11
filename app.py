@@ -21,10 +21,10 @@ def rgw_color():
 
 @app.route('/_post_rgbw_color/', methods=['POST'])
 def _post_rgbw_color():
-    r = request.form['red']
-    g = request.form['green']
-    b = request.form['blue']
-    w = request.form['white']
+    r = request.form['r']
+    g = request.form['g']
+    b = request.form['b']
+    w = request.form['w']
 
     request_string = "<rgbw,"+str(r)+","+str(g)+","+str(b)+","+str(w)+">"
 
