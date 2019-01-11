@@ -1,0 +1,22 @@
+body {
+    margin:20px;
+}
+
+
+.sliders {
+     margin: 15px;
+}
+
+#preview {
+    height: 100px;
+    width: 100%;
+    color: #000;
+    background: #000;
+    border: 1px solid #FFF;
+    box-shadow: 0 0 10px;
+}    
+
+#red-slider .noUi-connect { background: #c0392b; }
+#green-slider .noUi-connect { background: #27ae60; }
+#blue-slider .noUi-connect { background: #2980b9; }
+#white-slider .noUi-connect { background: #ffffff; }
