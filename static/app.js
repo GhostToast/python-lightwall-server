@@ -56,21 +56,18 @@ function rgbwColorPicker() {
             saveColor.style.display = 'inline-block';
             colors[index] = slider.noUiSlider.get();
 
-            console.log(colors);
-
-            var alpha = makeAlpha(colors[3]);
-            var previewColor = 'rgba('+colors[0]+','+colors[1]+','+colors[2]+','+alpha+')';
+            var rgbw = getColors();
+            var alpha = makeAlpha(rgbw.w);
+            var previewColor = 'rgba('+rgbw.r+','+rgbw.g+','+rgbw.b+','+alpha+')';
             previewElement.style.background = previewColor;
             previewElement.style.color = previewColor;
 
-            var colorsData = getColors();
-            console.log(colorsData);
             fetch('/_post_rgbw_color/', {
                 method: 'POST',
                 headers: {
                     'content-type': 'application/json'
                 },
-                body: JSON.stringify(getColors())
+                body: JSON.stringify(rgbw)
             }).then(
                 response => response.text()
             ).then(
