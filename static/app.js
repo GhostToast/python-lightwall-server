@@ -7,10 +7,9 @@ $( function() {
     var previewElement  = document.getElementById('preview');
     var colors = [0, 0, 0, 0];
 
-
-
     // Load color pickers, leveraging noUiSlider.
     function rgbwColorPicker() {
+        saveColor.style.display = 'none';
         [].slice.call(sliders).forEach(function (slider, index) {
 
             noUiSlider.create(slider, {
@@ -46,7 +45,10 @@ $( function() {
 
             // Bind the color changing function to the update event.
             slider.noUiSlider.on('set', function () {
+                saveColor.style.display = 'inline-block';
                 colors[index] = slider.noUiSlider.get();
+
+                console.log(colors);
 
                 var alpha = makeAlpha(colors[3]);
                 var previewColor = 'rgba('+colors[0]+','+colors[1]+','+colors[2]+','+alpha+')';
@@ -54,7 +56,8 @@ $( function() {
                 previewElement.style.color = previewColor;
 
                 colorsData = getColors();
-                
+
+                // Send color to server.
                 $.ajax({
                     url: '/_post_rgbw_color/',
                     type: 'POST',
@@ -66,29 +69,6 @@ $( function() {
                 });
             });
         });
-
-        function refreshSwatch() {
-            var r = parseInt(redSlider.noUiSlider.get()),
-                g = parseInt(greenSlider.noUiSlider.get()),
-                b = parseInt(blueSlider.noUiSlider.get()),
-                w = parseInt(whiteSlider.noUiSlider.get());
-
-            console.log( "r"+r+"g"+g+"b"+b+"w"+w );
-            $.ajax({
-                    url: '/_post_rgbw_color/',
-                    type: 'POST',
-                    dataType: 'json',
-                    data: {
-                        red: r,
-                        blue: b,
-                        green: g,
-                        white: w
-                    },
-                    success: function(resp) {
-                        console.log(resp);
-                    }
-            });
-        }
     }
 
     // Load swatches from server.
@@ -105,25 +85,46 @@ $( function() {
         swatchWrapper.classList.add('swatch-wrapper');
         
         var swatchAnchor = document.createElement('a');
-        swatchAnchor.classList.add('swatch');
+        swatchAnchor.classList.add('swatch', 'text-right');
+
+        var swatchDelBtn = document.createElement('button');
+        swatchDelBtn.classList.add('btn', 'btn-danger');
+        swatchDelBtn.setAttribute('type','button');
+
+        var swatchDelBtnIcon = document.createElement('i');
+        swatchDelBtnIcon.classList.add('material-icons');
+        swatchDelBtnIcon.appendChild(document.createTextNode('delete'));
+        swatchDelBtn.appendChild(swatchDelBtnIcon);
+        swatchDelBtn.addEventListener('click', swatchDeleteHandler);
         
-        swatchAnchor.style.background = 'rgba('+swatch.r+','+swatch.g+','+swatch.b+','+makeAlpha(swatch.w)+''
+        swatchAnchor.appendChild(swatchDelBtn);
+
+        var styleColor = 'rgba('+swatch.r+','+swatch.g+','+swatch.b+','+makeAlpha(swatch.w)+')';
+        swatchAnchor.style.background = styleColor;
         swatchAnchor.setAttribute('data-r', swatch.r);
         swatchAnchor.setAttribute('data-g', swatch.g);
         swatchAnchor.setAttribute('data-b', swatch.b);
         swatchAnchor.setAttribute('data-w', swatch.w);
         swatchAnchor.href = 'javascript:void(0)';
-        swatchAnchor.addEventListener('click', addSwatchLoadBinding);
+        swatchAnchor.addEventListener('click', swatchClickHandler);
+    
         swatchWrapper.appendChild(swatchAnchor)
         swatchContainer.insertBefore(swatchWrapper, swatchContainer.firstChild);
     }
 
-    function addSwatchLoadBinding(e) {
+    // Handle a swatch click.
+    function swatchClickHandler(e) {
+        var swatchList = document.getElementsByClassName('swatch');
+        [].forEach.call(swatchList, function(el) {
+            el.classList.remove('active');
+        });
+        e.target.classList.add('active');
+        
         colors = [
-            e.target.getAttribute('data-r'),
-            e.target.getAttribute('data-g'),
-            e.target.getAttribute('data-b'),
-            e.target.getAttribute('data-w')
+            parseInt(e.target.getAttribute('data-r')),
+            parseInt(e.target.getAttribute('data-g')),
+            parseInt(e.target.getAttribute('data-b')),
+            parseInt(e.target.getAttribute('data-w'))
         ];
         var update = false;
         [].slice.call(sliders).forEach(function (slider, index) {
@@ -132,15 +133,26 @@ $( function() {
             }
             slider.noUiSlider.setHandle(0, colors[index], update);
         });
+        saveColor.style.display = 'none';
     }
 
+    // Handle deleting a swatch.
+    function swatchDeleteHandler(e) {
+        e.stopPropagation();
+        var swatchToDelete = e.target.closest('div.swatch-wrapper');
+        swatchToDelete.parentNode.removeChild(swatchToDelete);
+    }
+
+    // Add event listener for saving a swatch.
     function addSwatchSaveBinding() {
         saveColor.addEventListener('click', function(e) {
+            saveColor.style.display = 'none';
             swatch = getColors();
             addSwatch(swatch);
         });
     }
 
+    // Get current state of colors array.
     function getColors() {
         return {
             r: colors[0],
@@ -155,10 +167,25 @@ $( function() {
         return 1-(alpha/255);
     }
 
+    function addBodyClickBinding() {
+        document.body.addEventListener('click', function(e) {
+            if (e.target.classList.contains('swatch')){
+                return;
+            } else {
+                var swatchList = document.getElementsByClassName('swatch');
+                [].forEach.call(swatchList, function(el) {
+                    el.classList.remove('active');
+                });
+            }
+        });
+    }
+                
+
     $( document ).ready(function() {
         loadSwatches();
         rgbwColorPicker();
         addSwatchSaveBinding();
+        addBodyClickBinding();
     });
 
 

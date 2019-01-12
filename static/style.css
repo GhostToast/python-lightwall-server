@@ -38,6 +38,7 @@ body {
 }
 
 .swatch-wrapper {
+    float:left;
     width:100px;
     max-width:33.33%;
     height:100px;
@@ -46,8 +47,21 @@ body {
 }
 
 .swatch {
-    width: 100px;
+    width: 100%;
+    box-sizing:border-box;
     height: 100px;
     background: #000;
+    display: inline-block;
+}
+
+.swatch .btn {
+    display: none;
+}
+
+.swatch.active {
+    border: 1px solid #FFF;
+}
+
+.swatch.active .btn {
     display: inline-block;
 }
