@@ -62,6 +62,7 @@ function rgbwColorPicker() {
             previewElement.style.background = previewColor;
             previewElement.style.color = previewColor;
 
+            // Send color to server, to update light wall.
             fetch('/_post_rgbw_color/', {
                 method: 'POST',
                 headers: {
@@ -73,12 +74,6 @@ function rgbwColorPicker() {
             ).then(
                 html => console.log(html)
             );
-
-            // Send color to server.
-            //var xmlhttp = new XMLHttpRequest();
-            //xmlhttp.open('POST', '/_post_rgbw_color');
-            //xmlhttp.setRequestHeader('Content-Type', 'application/json');
-            //xmlhttp.send(JSON.stringify(colorsData));
         });
     });
 }
@@ -150,8 +145,17 @@ function swatchClickHandler(e) {
 // Handle deleting a swatch.
 function swatchDeleteHandler(e) {
     e.stopPropagation();
-    var swatchToDelete = e.target.closest('div.swatch-wrapper');
-    swatchToDelete.parentNode.removeChild(swatchToDelete);
+    var swatchToDelete = e.target.closest('div.swatch');
+    var swatchWrapper = e.target.closest('div.swatch-wrapper');
+    var swatchData = {
+        r: parseInt(swatchToDelete.getAttribute('data-r')),
+        g: parseInt(swatchToDelete.getAttribute('data-g')),
+        b: parseInt(swatchToDelete.getAttribute('data-b')),
+        w: parseInt(swatchToDelete.getAttribute('data-w'))
+    }
+    deleteSwatch(swatchData);
+    
+    swatchWrapper.parentNode.removeChild(swatchWrapper);
 }
 
 // Add event listener for saving a swatch.
@@ -160,7 +164,44 @@ function addSwatchSaveBinding() {
         saveColor.style.display = 'none';
         swatch = getColors();
         addSwatch(swatch);
+        saveSwatch(swatch);
     });
+}
+
+// Save swatch to data storage.
+function saveSwatch(swatch) {
+    // Add type for parity with data model.
+    swatch.type = "rgbw";
+
+    fetch('/_rgbw_swatch_data/', {
+        method: 'PUT',
+        headers: {
+            'content-type': 'application/json'
+        },
+        body: JSON.stringify(swatch)
+    }).then(
+        response => response.text()
+    ).then(
+        html => console.log(html)
+    );
+}
+
+// Delete swatch from data storage.
+function deleteSwatch(swatch) {
+    // Add type for parity with data model.
+    swatch.type = "rgbw";
+
+    fetch('/_rgbw_swatch_data/', {
+        method: 'DELETE',
+        headers: {
+            'content-type': 'application/json'
+        },
+        body: JSON.stringify(swatch)
+    }).then(
+        response => response.text()
+    ).then(
+        html => console.log(html)
+    );
 }
 
 // Get current state of colors array.
