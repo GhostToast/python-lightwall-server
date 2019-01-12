@@ -1,6 +1,7 @@
 /* global swatches */
 $( function() {
 
+    var sliders = document.getElementsByClassName('sliders');
     var swatchContainer = document.getElementById('swatch-container');
     var saveColor       = document.getElementById('save-color');
     var previewElement  = document.getElementById('preview');
@@ -10,8 +11,6 @@ $( function() {
 
     // Load color pickers, leveraging noUiSlider.
     function rgbwColorPicker() {
-        var sliders = document.getElementsByClassName('sliders');
-
         [].slice.call(sliders).forEach(function (slider, index) {
 
             noUiSlider.create(slider, {
@@ -105,15 +104,37 @@ $( function() {
         var swatchWrapper = document.createElement('div');
         swatchWrapper.classList.add('swatch-wrapper');
         
-        var swatchDiv     = document.createElement('div');
-        swatchDiv.classList.add('swatch');
+        var swatchAnchor = document.createElement('a');
+        swatchAnchor.classList.add('swatch');
         
-        swatchDiv.style.background = 'rgba('+swatch.r+','+swatch.g+','+swatch.b+','+makeAlpha(swatch.w)+''
-        swatchWrapper.appendChild(swatchDiv)
-        swatchContainer.appendChild(swatchWrapper);
+        swatchAnchor.style.background = 'rgba('+swatch.r+','+swatch.g+','+swatch.b+','+makeAlpha(swatch.w)+''
+        swatchAnchor.setAttribute('data-r', swatch.r);
+        swatchAnchor.setAttribute('data-g', swatch.g);
+        swatchAnchor.setAttribute('data-b', swatch.b);
+        swatchAnchor.setAttribute('data-w', swatch.w);
+        swatchAnchor.href = 'javascript:void(0)';
+        swatchAnchor.addEventListener('click', addSwatchLoadBinding);
+        swatchWrapper.appendChild(swatchAnchor)
+        swatchContainer.insertBefore(swatchWrapper, swatchContainer.firstChild);
     }
 
-    function swatchBindings() {
+    function addSwatchLoadBinding(e) {
+        colors = [
+            e.target.getAttribute('data-r'),
+            e.target.getAttribute('data-g'),
+            e.target.getAttribute('data-b'),
+            e.target.getAttribute('data-w')
+        ];
+        var update = false;
+        [].slice.call(sliders).forEach(function (slider, index) {
+            if ( 3 == index ) {
+                update = true;
+            }
+            slider.noUiSlider.setHandle(0, colors[index], update);
+        });
+    }
+
+    function addSwatchSaveBinding() {
         saveColor.addEventListener('click', function(e) {
             swatch = getColors();
             addSwatch(swatch);
@@ -137,7 +158,7 @@ $( function() {
     $( document ).ready(function() {
         loadSwatches();
         rgbwColorPicker();
-        swatchBindings();
+        addSwatchSaveBinding();
     });
 
 
