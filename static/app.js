@@ -1,7 +1,7 @@
-/* global swatches */
+/* global swatches, initialState */
 
 // Initialize RGBW Color picker if on proper page.
-if (window.location.pathname.indexOf('rgbw-color')) {
+if (window.location.pathname.indexOf('rgbw-color') == 1) {
     var sliders = document.getElementsByClassName('sliders');
     var swatchContainer = document.getElementById('swatch-container');
     var saveColor       = document.getElementById('save-color');
@@ -9,10 +9,29 @@ if (window.location.pathname.indexOf('rgbw-color')) {
     var colors = [0, 0, 0, 0];
 
     // Load for RGBW Color Picker.
+    setInitialState();
     loadSwatches();
     rgbwColorPicker();
     addSwatchSaveBinding();
     addBodyClickBinding();
+}
+
+// Load colors from server.
+function setInitialState() {
+    if (initialState.r) {
+        colors[0] = initialState.r;
+    }
+    if (initialState.g) {
+        colors[1] = initialState.g;
+    }
+    if (initialState.b) {
+        colors[2] = initialState.b;
+    }
+    if (initialState.w) {
+        colors[3] = initialState.w;
+    }
+    var rgbw = getColors();
+    updatePreview(rgbw);
 }
 
 // Load color pickers, leveraging noUiSlider.
@@ -21,7 +40,7 @@ function rgbwColorPicker() {
     [].slice.call(sliders).forEach(function (slider, index) {
 
         noUiSlider.create(slider, {
-            start: 0,
+            start: colors[index],
             step: 1,
             connect: [true, false],
             tooltips: [true],
@@ -57,10 +76,7 @@ function rgbwColorPicker() {
             colors[index] = slider.noUiSlider.get();
 
             var rgbw = getColors();
-            var alpha = makeAlpha(rgbw.w);
-            var previewColor = 'rgba('+rgbw.r+','+rgbw.g+','+rgbw.b+','+alpha+')';
-            previewElement.style.background = previewColor;
-            previewElement.style.color = previewColor;
+            updatePreview(rgbw);
 
             // Send color to server, to update light wall.
             fetch('/_post_rgbw_color/', {
@@ -76,6 +92,14 @@ function rgbwColorPicker() {
             );
         });
     });
+}
+
+// Update preview.
+function updatePreview(rgbw) {
+    var alpha = makeAlpha(rgbw.w);
+    var previewColor = 'rgba('+rgbw.r+','+rgbw.g+','+rgbw.b+','+alpha+')';
+    previewElement.style.background = previewColor;
+    previewElement.style.color = previewColor;
 }
 
 // Load swatches from server.
