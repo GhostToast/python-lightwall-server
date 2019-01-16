@@ -1,0 +1,26 @@
+{% include '_header.html' %}
+
+            <h1>Matrix Control</h1>
+            <h3>Prebuilt</h3>
+            <button type="button" class="btn bg-danger code-rain" id="red-code"
+                data-r="[192,256]"
+                data-g="[0,8]"
+                data-b="[0,8]"
+                data-w="[0,0]"
+                >
+                <i class="material-icons red">code</i>
+            </button>
+            <button type="button" class="btn bg-success code-rain" id="green-code" data-colormode="g">
+                <i class="material-icons green">code</i>
+            </button>
+            <button type="button" class="btn bg-primary code-rain" id="blue-code" data-colormode="b">
+                <i class="material-icons blue">code</i>
+            </button>
+
+            <h3>Customize</h3>
+            <div class="sliders" id="red-slider"></div>
+            <div class="sliders" id="green-slider"/></div>
+            <div class="sliders" id="blue-slider"/></div>
+            <div class="sliders" id="white-slider"/></div>
+{% include '_footer.html' %}
+

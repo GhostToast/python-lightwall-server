@@ -19,6 +19,30 @@ def index():
 def matrix():
     return render_template('matrix.html')
 
+# Endpoint for posting prebuilt matrix color mode.
+@app.route('/_post_matrix/', methods=['POST'])
+def _post_matrix():
+    data = request.get_json()
+    request_string = ("<matrix," +
+        str(data[0][0])+"," +
+        str(data[0][1])+"," +
+        str(data[1][0])+"," +
+        str(data[1][1])+"," +
+        str(data[2][0])+"," +
+        str(data[2][1])+"," +
+        str(data[3][0])+"," +
+        str(data[3][1])+">")
+
+    print ("Sending: " + request_string)
+    
+    # Send request.
+    ser = serial.Serial(TEENSY, 9600)
+    ser.write(request_string.encode('utf-8'))
+
+    # Send back simple response.
+    mode = ser.read()
+    return jsonify({'response': mode})
+
 # Route for RGBW color picker.
 @app.route('/rgbw-color')
 def rgw_color():
@@ -67,8 +91,7 @@ def _post_rgbw_color():
 
     request_string = "<rgbw,"+str(r)+","+str(g)+","+str(b)+","+str(w)+">"
 
-    print ("Sending..")
-    print (request_string)
+    print ("Sending: " + request_string)
     
     # Send request.
     ser = serial.Serial(TEENSY, 9600)
