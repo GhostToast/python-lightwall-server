@@ -21,9 +21,20 @@ if (window.location.pathname.indexOf('matrix') == 1) {
     var matrixButtons = document.getElementsByClassName('code-rain');
     var sliders = document.getElementsByClassName('sliders');
     var colors = [[0, 0], [0, 0], [0, 0], [0, 0]];
+    var endpoint = 
 
-    addColorModeClickBinding();
+    addMatrixColorModeClickBinding();
     matrixColorSliders();
+}
+
+// Initialize Color Gradient if on proper page.
+if (window.location.pathname.indexOf('gradient-color') == 1) {
+    var gradientButtons = document.getElementsByClassName('gradient-color');
+    var sliders = document.getElementsByClassName('sliders');
+    var colors = [[0, 0], [0, 0], [0, 0], [0, 0]];
+
+    addGradientColorModeClickBinding();
+    gradientColorSliders();
 }
 
 // Load matrix sliders, leveraging noUiSlider.
@@ -81,7 +92,7 @@ function matrixColorSliders() {
     });
 }
 
-function addColorModeClickBinding() {
+function addMatrixColorModeClickBinding() {
     [].slice.call(matrixButtons).forEach(function (button, index) {
         button.addEventListener('click', function(e) {
             var button = e.target.closest('button.code-rain');
@@ -94,6 +105,88 @@ function addColorModeClickBinding() {
             console.log(data);
             e.preventDefault();
             fetch('/_post_matrix/', {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            }).then(
+                response => response.text()
+            ).then(
+                html => console.log(html)
+            );
+        });
+    });
+}
+
+// Load matrix sliders, leveraging noUiSlider.
+function gradientColorSliders() {
+    [].slice.call(sliders).forEach(function (slider, index) {
+
+        noUiSlider.create(slider, {
+            start: [0, 16],
+            step: 1,
+            connect: true,
+            tooltips: true,
+            range: {
+                'min': [0],
+                'max': [255]
+            },
+            format: {
+                to: function (value) {
+                    return parseInt(value);
+                },
+                from: function (value) {
+                    return parseInt(value);
+                }
+            }
+        });
+
+        // Bind keyboard.
+        var handle = slider.querySelector('.noUi-handle');
+        handle.addEventListener('keydown', function (e) {
+            var value = parseInt(slider.noUiSlider.get());
+            if (e.which === 37) {
+                slider.noUiSlider.set(value - 1);
+            }
+            if (e.which === 39) {
+                slider.noUiSlider.set(value + 1);
+            }
+        });
+
+        // Bind the color changing function to the update event.
+        slider.noUiSlider.on('set', function () {
+            colors[index] = slider.noUiSlider.get();
+
+            // Send color to server, to update light wall.
+            fetch('/_post_gradient/', {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json'
+                },
+                body: JSON.stringify(colors)
+            }).then(
+                response => response.text()
+            ).then(
+                html => console.log(html)
+            );
+        });
+    });
+}
+
+function addGradientColorModeClickBinding() {
+    [].slice.call(gradientButtons).forEach(function (button, index) {
+        button.addEventListener('click', function(e) {
+            var button = e.target.closest('button.gradient-color');
+            var data = [
+                JSON.parse(button.getAttribute('data-r')),
+                JSON.parse(button.getAttribute('data-g')),
+                JSON.parse(button.getAttribute('data-b')),
+                JSON.parse(button.getAttribute('data-w'))
+            ];
+            console.log(data);
+            e.preventDefault();
+            fetch('/_post_gradient/', {
                 method: 'POST',
                 headers: {
                     'content-type': 'application/json'

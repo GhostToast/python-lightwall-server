@@ -43,9 +43,37 @@ def _post_matrix():
     mode = ser.read()
     return jsonify({'response': mode})
 
+# Route for Gradient picker.
+@app.route('/gradient-color')
+def gradient_color():
+    return render_template('gradient-color.html')
+
+@app.route('/_post_gradient/', methods=['POST'])
+def _post_grade():
+    data = request.get_json()
+    request_string = ("<grade," +
+        str(data[0][0])+"," +
+        str(data[0][1])+"," +
+        str(data[1][0])+"," +
+        str(data[1][1])+"," +
+        str(data[2][0])+"," +
+        str(data[2][1])+"," +
+        str(data[3][0])+"," +
+        str(data[3][1])+">")
+
+    print ("Sending: " + request_string)
+    
+    # Send request.
+    ser = serial.Serial(TEENSY, 9600)
+    ser.write(request_string.encode('utf-8'))
+
+    # Send back simple response.
+    mode = ser.read()
+    return jsonify({'response': mode})
+
 # Route for RGBW color picker.
 @app.route('/rgbw-color')
-def rgw_color():
+def rgbw_color():
     initial_state = {
         'type': 'rgbw',
         'r': 0,
