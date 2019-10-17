@@ -1,5 +1,7 @@
 /* global swatches, initialState */
 
+var mode;
+
 // Initialize RGBW Color picker if on proper page.
 if (window.location.pathname.indexOf('rgbw-color') == 1) {
     var sliders = document.getElementsByClassName('sliders');
@@ -14,28 +16,41 @@ if (window.location.pathname.indexOf('rgbw-color') == 1) {
     rgbwColorPicker();
     addSwatchSaveBinding();
     addBodyClickBinding();
+    mode = 'rgbw';
 }
 
 // Initialize Matrix if on proper page.
 if (window.location.pathname.indexOf('matrix') == 1) {
     var matrixButtons = document.getElementsByClassName('code-rain');
     var sliders = document.getElementsByClassName('sliders');
+    var pauseButton = document.getElementById('pause-code');
     var colors = [[0, 0], [0, 0], [0, 0], [0, 0]];
-    var endpoint = 
 
-    addMatrixColorModeClickBinding();
+    addColorModeClickBinding();
+    addPauseButtonBinding();
     matrixColorSliders();
+    mode = 'matrix';
 }
 
-// Initialize Color Gradient if on proper page.
+// Initialize Gradient if on proper page.
 if (window.location.pathname.indexOf('gradient-color') == 1) {
-    var gradientButtons = document.getElementsByClassName('gradient-color');
     var sliders = document.getElementsByClassName('sliders');
-    var colors = [[0, 0], [0, 0], [0, 0], [0, 0]];
+    var swatchContainer = document.getElementById('swatch-container');
+    var saveColor       = document.getElementById('save-color');
+    var previewElement  = document.getElementById('preview');
+    var sendColor       = document.getElementById('send-color');
+    var colors = [0, 0, 0, 0];
 
-    addGradientColorModeClickBinding();
-    gradientColorSliders();
+    // Load for RGBW Color Picker.
+    setInitialState();
+    loadSwatches();
+    rgbwColorPicker();
+    addSwatchSaveBinding();
+    addBodyClickBinding();
+    addGradientClickBinding();
+    mode = 'gradient';
 }
+    
 
 // Load matrix sliders, leveraging noUiSlider.
 function matrixColorSliders() {
@@ -92,7 +107,7 @@ function matrixColorSliders() {
     });
 }
 
-function addMatrixColorModeClickBinding() {
+function addColorModeClickBinding() {
     [].slice.call(matrixButtons).forEach(function (button, index) {
         button.addEventListener('click', function(e) {
             var button = e.target.closest('button.code-rain');
@@ -119,84 +134,14 @@ function addMatrixColorModeClickBinding() {
     });
 }
 
-// Load matrix sliders, leveraging noUiSlider.
-function gradientColorSliders() {
-    [].slice.call(sliders).forEach(function (slider, index) {
-
-        noUiSlider.create(slider, {
-            start: [0, 16],
-            step: 1,
-            connect: true,
-            tooltips: true,
-            range: {
-                'min': [0],
-                'max': [255]
-            },
-            format: {
-                to: function (value) {
-                    return parseInt(value);
-                },
-                from: function (value) {
-                    return parseInt(value);
-                }
+function addPauseButtonBinding() {
+    pauseButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        fetch('/_pause_matrix/', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json'
             }
-        });
-
-        // Bind keyboard.
-        var handle = slider.querySelector('.noUi-handle');
-        handle.addEventListener('keydown', function (e) {
-            var value = parseInt(slider.noUiSlider.get());
-            if (e.which === 37) {
-                slider.noUiSlider.set(value - 1);
-            }
-            if (e.which === 39) {
-                slider.noUiSlider.set(value + 1);
-            }
-        });
-
-        // Bind the color changing function to the update event.
-        slider.noUiSlider.on('set', function () {
-            colors[index] = slider.noUiSlider.get();
-
-            // Send color to server, to update light wall.
-            fetch('/_post_gradient/', {
-                method: 'POST',
-                headers: {
-                    'content-type': 'application/json'
-                },
-                body: JSON.stringify(colors)
-            }).then(
-                response => response.text()
-            ).then(
-                html => console.log(html)
-            );
-        });
-    });
-}
-
-function addGradientColorModeClickBinding() {
-    [].slice.call(gradientButtons).forEach(function (button, index) {
-        button.addEventListener('click', function(e) {
-            var button = e.target.closest('button.gradient-color');
-            var data = [
-                JSON.parse(button.getAttribute('data-r')),
-                JSON.parse(button.getAttribute('data-g')),
-                JSON.parse(button.getAttribute('data-b')),
-                JSON.parse(button.getAttribute('data-w'))
-            ];
-            console.log(data);
-            e.preventDefault();
-            fetch('/_post_gradient/', {
-                method: 'POST',
-                headers: {
-                    'content-type': 'application/json'
-                },
-                body: JSON.stringify(data)
-            }).then(
-                response => response.text()
-            ).then(
-                html => console.log(html)
-            );
         });
     });
 }
@@ -264,18 +209,20 @@ function rgbwColorPicker() {
             var rgbw = getColors();
             updatePreview(rgbw);
 
-            // Send color to server, to update light wall.
-            fetch('/_post_rgbw_color/', {
-                method: 'POST',
-                headers: {
-                    'content-type': 'application/json'
-                },
-                body: JSON.stringify(rgbw)
-            }).then(
-                response => response.text()
-            ).then(
-                html => console.log(html)
-            );
+            if ( mode === 'rgbw' ) {
+                // Send color to server, to update light wall.
+                fetch('/_post_rgbw_color/', {
+                    method: 'POST',
+                    headers: {
+                        'content-type': 'application/json'
+                    },
+                    body: JSON.stringify(rgbw)
+                }).then(
+                    response => response.text()
+                ).then(
+                    html => console.log(html)
+                );
+            }
         });
     });
 }
@@ -442,3 +389,23 @@ function addBodyClickBinding() {
         }
     });
 }
+
+// Add event listener for clicking gradient send button.
+function addGradientClickBinding() {
+    sendColor.addEventListener('click', function(e) {
+        // Send color to server, to update light wall.
+        fetch('/_post_gradient/', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify(getColors())
+        }).then(
+            response => response.text()
+        ).then(
+            html => console.log(html)
+        );
+    });
+}
+
+    
