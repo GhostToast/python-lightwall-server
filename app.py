@@ -23,13 +23,17 @@ def matrix():
 @app.route('/_pause_matrix/', methods=['POST'])
 def _pause_matrix():
     data = request.get_json()
-    if (_pause_matrix.status == 0):
-        _pause_matrix.status = 1
-    elif (_pause_matrix.status == 1):
-        _pause_matrix.status = 0
+ 
+    request_string = ("<pause," + str(data['pause']) + ">")
+    print ("Sending: " + request_string)
+
+    # Send request.
     ser = serial.Serial(TEENSY, 9600)
-    ser.write(("<pause," + _pause_matrix.status).encode('utf-8'))
-_pause_matrix.status = 0
+    ser.write(request_string.encode('utf-8'))
+
+    # Send back simple response.
+    mode = ser.read()
+    return jsonify({'response': mode})
 
 # Endpoint for posting prebuilt matrix color mode.
 @app.route('/_post_matrix/', methods=['POST'])

@@ -65,3 +65,12 @@ body {
 .swatch.active .btn {
     display: inline-block;
 }
+
+#send-color {
+    margin-top: 12px;
+}
+
+#play-code {
+    display: none;
+}
+
