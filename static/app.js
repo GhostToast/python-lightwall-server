@@ -24,10 +24,11 @@ if (window.location.pathname.indexOf('matrix') == 1) {
     var matrixButtons = document.getElementsByClassName('code-rain');
     var sliders = document.getElementsByClassName('sliders');
     var pauseButton = document.getElementById('pause-code');
+    var playButton = document.getElementById('play-code');
     var colors = [[0, 0], [0, 0], [0, 0], [0, 0]];
 
     addColorModeClickBinding();
-    addPauseButtonBinding();
+    addPausePlayButtonBinding();
     matrixColorSliders();
     mode = 'matrix';
 }
@@ -134,15 +135,39 @@ function addColorModeClickBinding() {
     });
 }
 
-function addPauseButtonBinding() {
+function addPausePlayButtonBinding() {
     pauseButton.addEventListener('click', function(e) {
+        pauseButton.style.display = 'none';
+        playButton.style.display = 'block';
         e.preventDefault();
         fetch('/_pause_matrix/', {
             method: 'POST',
             headers: {
                 'content-type': 'application/json'
-            }
-        });
+            },
+            body: JSON.stringify({pause: 1})
+        }).then(
+            response => response.text()
+        ).then(
+            html => console.log(html)
+        );
+    });
+
+    playButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        playButton.style.display = 'none';
+        pauseButton.style.display = 'block';
+        fetch('/_pause_matrix/', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify({pause: 0})
+        }).then(
+            response => response.text()
+        ).then(
+            html => console.log(html)
+        );
     });
 }
     

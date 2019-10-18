@@ -69,3 +69,8 @@ body {
 #send-color {
     margin-top: 12px;
 }
+
+#play-code {
+    display: none;
+}
+
