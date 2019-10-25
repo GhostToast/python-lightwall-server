@@ -118,7 +118,6 @@ function addColorModeClickBinding() {
                 JSON.parse(button.getAttribute('data-b')),
                 JSON.parse(button.getAttribute('data-w'))
             ];
-            console.log(data);
             e.preventDefault();
             fetch('/_post_matrix/', {
                 method: 'POST',
@@ -254,8 +253,7 @@ function rgbwColorPicker() {
 
 // Update preview.
 function updatePreview(rgbw) {
-    var alpha = makeAlpha(rgbw.w);
-    var previewColor = 'rgba('+rgbw.r+','+rgbw.g+','+rgbw.b+','+alpha+')';
+    var previewColor = buildPreviewColor(rgbw);
     previewElement.style.background = previewColor;
     previewElement.style.color = previewColor;
 }
@@ -288,7 +286,7 @@ function addSwatch(swatch) {
     
     swatchElement.appendChild(swatchDelBtn);
 
-    var styleColor = 'rgba('+swatch.r+','+swatch.g+','+swatch.b+','+makeAlpha(swatch.w)+')';
+    var styleColor = buildPreviewColor(swatch);
     swatchElement.style.background = styleColor;
     swatchElement.setAttribute('data-r', swatch.r);
     swatchElement.setAttribute('data-g', swatch.g);
@@ -298,6 +296,44 @@ function addSwatch(swatch) {
 
     swatchWrapper.appendChild(swatchElement)
     swatchContainer.insertBefore(swatchWrapper, swatchContainer.firstChild);
+}
+
+function buildPreviewColor(rgbw) {
+    var preview = {
+        r: 0,
+        g: 0,
+        b: 0,
+        w: 0
+    };
+
+    if (rgbw.r) {
+        preview.r = curveColor(rgbw.r);
+    }
+
+    if (rgbw.g) {
+        preview.g = curveColor(rgbw.g);
+    }
+
+    if (rgbw.b) {
+        preview.b = curveColor(rgbw.b);
+    }
+
+    if (rgbw.w) {
+        preview.w = curveColor(rgbw.w);
+    }
+
+    console.log(preview);
+
+    return 'rgba('+preview.r+','+preview.g+','+preview.b+','+makeAlpha(preview.w)+')';
+}
+
+// Amplify color for better preview.
+function curveColor(color=0) {
+    color = parseInt(color,10);
+    if (color > 0) {
+        return Math.min(255, color+64);
+    }
+    return color;
 }
 
 // Handle a swatch click.
