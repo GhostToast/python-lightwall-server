@@ -14,12 +14,33 @@ db = TinyDB('db.json')
 def index():
     return render_template('index.html')
 
+# Route for fire.
+@app.route('/fire')
+def fire():
+    return render_template('fire.html')
+
+# Route to pause/play (with) fire.
+@app.route('/_fire/', methods=['POST'])
+def _fire():
+    data = request.get_json()
+
+    request_string = ("<fire," + str(data['pause']) + ">")
+    print ("Sending: " + request_string)
+
+    # Send request.
+    ser = serial.Serial(TEENSY, 9600)
+    ser.write(request_string.encode('utf-8'))
+
+    # Send back simple response.
+    mode = ser.read()
+    return jsonify({'response': mode})
+
 # Route for matrix.
 @app.route('/matrix')
 def matrix():
     return render_template('matrix.html')
 
-# Route to pause matrix.
+# Route to play/pause matrix.
 @app.route('/_pause_matrix/', methods=['POST'])
 def _pause_matrix():
     data = request.get_json()

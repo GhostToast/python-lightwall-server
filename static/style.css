@@ -70,7 +70,10 @@ body {
     margin-top: 12px;
 }
 
-#play-code {
+#play-matrix {
     display: none;
 }
 
+#pause-fire {
+    display: none;
+}
