@@ -489,7 +489,7 @@ function buildHSLPreviewColor(hsl) {
         preview.s = parseInt(hsl.s, 10);
     }
     if (hsl.l) {
-        preview.l = parseInt(hsl.l, 10);
+        preview.l = curveLightness(hsl.l);
     }
 
     console.log(preview);
@@ -533,6 +533,15 @@ function curveColor(color=0) {
         return Math.min(255, color+64);
     }
     return color;
+}
+
+// Amplify lightness for better preview.
+function curveLightness(lightness=0) {
+    lightness = parseInt(lightness,10);
+    if (lightness > 0) {
+        return Math.min(100, lightness+15);
+    }
+    return lightness;
 }
 
 // Handle a swatch click.
