@@ -4,6 +4,7 @@ var mode;
 
 // Initialize RGBW Color picker if on proper page.
 if (window.location.pathname.indexOf('rgbw-color') == 1) {
+    mode = 'rgbw';
     var sliders = document.getElementsByClassName('sliders');
     var swatchContainer = document.getElementById('swatch-container');
     var saveColor       = document.getElementById('save-color');
@@ -11,19 +12,49 @@ if (window.location.pathname.indexOf('rgbw-color') == 1) {
     var colors = [0, 0, 0, 0];
 
     // Load for RGBW Color Picker.
-    setInitialState();
+    setInitialRGBWState();
     loadSwatches();
     rgbwColorPicker();
     addSwatchSaveBinding();
     addBodyClickBinding();
-    mode = 'rgbw';
+}
+
+// Initialize HSL Color picker if on proper page.
+if (window.location.pathname.indexOf('hsl-color') == 1) {
+    mode = 'hsl';
+    var sliders = document.getElementsByClassName('sliders');
+    var swatchContainer = document.getElementById('swatch-container');
+    var saveColor       = document.getElementById('save-color');
+    var previewElement  = document.getElementById('preview');
+    var hsl = [0, 0, 0];
+
+    // Load for HSL Color Picker.
+    setInitialHSLState();
+    loadSwatches();
+    hslColorPicker();
+    setInitialHSLState(); // Initialize a second time to get the hue into saturation slider.
+    addSwatchSaveBinding();
+    addBodyClickBinding();
 }
 
 if (window.location.pathname.indexOf('fire') == 1) {
+    //var sliders = document.getElementsByClassName('sliders');
+    //var swatchContainer = document.getElementById('swatch-container');
+    //var saveColor       = document.getElementById('save-color');
+    //var previewElement  = document.getElementById('preview');
+    //var colors = [0, 0, 0, 0];
+
+    // Buttons
     var pauseFireButton = document.getElementById('pause-fire');
     var playFireButton = document.getElementById('play-fire');
 
+    //setInitialState();
+    //loadSwatches();
+    //rgbwColorPicker();
+    //addSwatchSaveBinding();
+    //addBodyClickBinding();
     addPausePlayFireButtonBinding();
+    mode = 'fire';
 }
 
 // Initialize Matrix if on proper page.
@@ -50,7 +81,7 @@ if (window.location.pathname.indexOf('gradient-color') == 1) {
     var colors = [0, 0, 0, 0];
 
     // Load for RGBW Color Picker.
-    setInitialState();
+    setInitialRGBWState();
     loadSwatches();
     rgbwColorPicker();
     addSwatchSaveBinding();
@@ -146,7 +177,7 @@ function addPausePlayFireButtonBinding() {
         e.preventDefault();
         playFireButton.style.display = 'none';
         pauseFireButton.style.display = 'block';
-        fetch('/_fire/', {
+        fetch('/_pause_fire/', {
             method: 'POST',
             headers: {
                 'content-type': 'application/json'
@@ -163,7 +194,7 @@ function addPausePlayFireButtonBinding() {
         e.preventDefault();
         pauseFireButton.style.display = 'none';
         playFireButton.style.display = 'block';
-        fetch('/_fire/', {
+        fetch('/_pause_fire/', {
             method: 'POST',
             headers: {
                 'content-type': 'application/json'
@@ -212,10 +243,23 @@ function addPausePlayMatrixButtonBinding() {
         );
     });
 }
-    
 
-// Load colors from server.
-function setInitialState() {
+// Load HSL colors from server.
+function setInitialHSLState() {
+    if (initialState.h) {
+        hsl[0] = initialState.h;
+    }
+    if (initialState.s) {
+        hsl[1] = initialState.s;
+    }
+    if (initialState.l) {
+        hsl[2] = initialState.l;
+    }
+    updateHSLPreview(getHSLColors());
+}
+
+// Load RGBW colors from server.
+function setInitialRGBWState() {
     if (initialState.r) {
         colors[0] = initialState.r;
     }
@@ -228,11 +272,77 @@ function setInitialState() {
     if (initialState.w) {
         colors[3] = initialState.w;
     }
-    var rgbw = getColors();
-    updatePreview(rgbw);
+    var rgbw = getRGBWColors();
+    updateRGBWPreview(rgbw);
 }
 
-// Load color pickers, leveraging noUiSlider.
+// Load HSL color pickers, leveraging noUiSlider.
+function hslColorPicker() {
+    saveColor.style.display = 'none';
+    [].slice.call(sliders).forEach(function (slider, index) {
+        var max = 100;
+        if (index == 0) {
+            max = 359;
+        }
+
+        noUiSlider.create(slider, {
+            start: hsl[index],
+            step: 1,
+            connect: [true, false],
+            tooltips: [true],
+            range: {
+                'min': 0,
+                'max': max
+            },
+            format: {
+                to: function (value) {
+                    return parseInt(value);
+                },
+                from: function (value) {
+                    return parseInt(value);
+                }
+            }
+        });
+
+        // Bind keyboard.
+        var handle = slider.querySelector('.noUi-handle');
+        handle.addEventListener('keydown', function (e) {
+            var value = parseInt(slider.noUiSlider.get());
+            if (e.which === 37) {
+                slider.noUiSlider.set(value - 1);
+            }
+            if (e.which === 39) {
+                slider.noUiSlider.set(value + 1);
+            }
+        });
+
+        // Bind the color changing function to the update event.
+        slider.noUiSlider.on('set', function () {
+            saveColor.style.display = 'inline-block';
+            hsl[index] = slider.noUiSlider.get();
+
+            var hslColors = getHSLColors();
+            updateHSLPreview(hslColors);
+
+            if ( mode === 'hsl' ) {
+                // Send color to server, to update light wall.
+                fetch('/_post_hsl_color/', {
+                    method: 'POST',
+                    headers: {
+                        'content-type': 'application/json'
+                    },
+                    body: JSON.stringify(hslColors)
+                }).then(
+                    response => response.text()
+                ).then(
+                    html => console.log(html)
+                );
+            }
+        });
+    });
+}
+
+// Load RGBW color pickers, leveraging noUiSlider.
 function rgbwColorPicker() {
     saveColor.style.display = 'none';
     [].slice.call(sliders).forEach(function (slider, index) {
@@ -273,8 +383,8 @@ function rgbwColorPicker() {
             saveColor.style.display = 'inline-block';
             colors[index] = slider.noUiSlider.get();
 
-            var rgbw = getColors();
-            updatePreview(rgbw);
+            var rgbw = getRGBWColors();
+            updateRGBWPreview(rgbw);
 
             if ( mode === 'rgbw' ) {
                 // Send color to server, to update light wall.
@@ -294,9 +404,24 @@ function rgbwColorPicker() {
     });
 }
 
-// Update preview.
-function updatePreview(rgbw) {
-    var previewColor = buildPreviewColor(rgbw);
+// Update HSL preview.
+function updateHSLPreview(hslcolors) {
+    var previewColor = buildHSLPreviewColor(hslcolors);
+    previewElement.style.background = previewColor;
+    previewElement.style.color = previewColor;
+    var saturation = sliders[1].getElementsByClassName('noUi-connects');
+    var lightness = sliders[2].getElementsByClassName('noUi-connects');
+    if (saturation && saturation[0]) {
+        saturation[0].style.background = 'linear-gradient(0.25turn, #808080, hsl('+hsl[0]+', 100%, 50%))';
+    }
+    if (lightness && lightness[0]) {
+        lightness[0].style.background = 'linear-gradient(0.25turn, #000000, hsl('+hsl[0]+', 100%, 50%), #FFFFFF)';
+    }
+}
+
+// Update RGBW preview.
+function updateRGBWPreview(rgbw) {
+    var previewColor = buildRGBWPreviewColor(rgbw);
     previewElement.style.background = previewColor;
     previewElement.style.color = previewColor;
 }
@@ -329,19 +454,50 @@ function addSwatch(swatch) {
     
     swatchElement.appendChild(swatchDelBtn);
 
-    var styleColor = buildPreviewColor(swatch);
-    swatchElement.style.background = styleColor;
-    swatchElement.setAttribute('data-r', swatch.r);
-    swatchElement.setAttribute('data-g', swatch.g);
-    swatchElement.setAttribute('data-b', swatch.b);
-    swatchElement.setAttribute('data-w', swatch.w);
+    if (mode === 'hsl') {
+        var styleColor = buildHSLPreviewColor(swatch);
+        swatchElement.style.background = styleColor;
+        swatchElement.setAttribute('data-h', swatch.h);
+        swatchElement.setAttribute('data-s', swatch.s);
+        swatchElement.setAttribute('data-l', swatch.l);
+    } else {
+        var styleColor = buildRGBWPreviewColor(swatch);
+        swatchElement.style.background = styleColor;
+        swatchElement.setAttribute('data-r', swatch.r);
+        swatchElement.setAttribute('data-g', swatch.g);
+        swatchElement.setAttribute('data-b', swatch.b);
+        swatchElement.setAttribute('data-w', swatch.w);
+    }
+
     swatchElement.addEventListener('click', swatchClickHandler);
 
     swatchWrapper.appendChild(swatchElement)
     swatchContainer.insertBefore(swatchWrapper, swatchContainer.firstChild);
 }
 
-function buildPreviewColor(rgbw) {
+function buildHSLPreviewColor(hsl) {
+    var preview = {
+        h: 0,
+        s: 0,
+        l: 0
+    };
+
+    if (hsl.h) {
+        preview.h = parseInt(hsl.h, 10);
+    }
+    if (hsl.s) {
+        preview.s = parseInt(hsl.s, 10);
+    }
+    if (hsl.l) {
+        preview.l = parseInt(hsl.l, 10);
+    }
+
+    console.log(preview);
+
+    return 'hsl('+preview.h+','+preview.s+'%,'+preview.l+'%)';
+}
+
+function buildRGBWPreviewColor(rgbw) {
     var preview = {
         r: 0,
         g: 0,
@@ -408,12 +564,21 @@ function swatchDeleteHandler(e) {
     e.stopPropagation();
     var swatchToDelete = e.target.closest('div.swatch');
     var swatchWrapper = e.target.closest('div.swatch-wrapper');
-    var swatchData = {
-        r: parseInt(swatchToDelete.getAttribute('data-r')),
-        g: parseInt(swatchToDelete.getAttribute('data-g')),
-        b: parseInt(swatchToDelete.getAttribute('data-b')),
-        w: parseInt(swatchToDelete.getAttribute('data-w'))
+    if (mode=='hsl') {
+        var swatchData = {
+            h: parseInt(swatchToDelete.getAttribute('data-h')),
+            s: parseInt(swatchToDelete.getAttribute('data-s')),
+            l: parseInt(swatchToDelete.getAttribute('data-l'))
+        }
+    } else {
+        var swatchData = {
+            r: parseInt(swatchToDelete.getAttribute('data-r')),
+            g: parseInt(swatchToDelete.getAttribute('data-g')),
+            b: parseInt(swatchToDelete.getAttribute('data-b')),
+            w: parseInt(swatchToDelete.getAttribute('data-w'))
+        }
     }
+
     deleteSwatch(swatchData);
     
     swatchWrapper.parentNode.removeChild(swatchWrapper);
@@ -423,7 +588,11 @@ function swatchDeleteHandler(e) {
 function addSwatchSaveBinding() {
     saveColor.addEventListener('click', function(e) {
         saveColor.style.display = 'none';
-        swatch = getColors();
+        if (mode === 'hsl') {
+            swatch = getHSLColors();
+        } else {
+            swatch = getRGBWColors();
+        }
         addSwatch(swatch);
         saveSwatch(swatch);
     });
@@ -432,9 +601,15 @@ function addSwatchSaveBinding() {
 // Save swatch to data storage.
 function saveSwatch(swatch) {
     // Add type for parity with data model.
-    swatch.type = "rgbw";
+    swatch.type = 'rgbw';
+    var endpoint = '/_rgbw_swatch_data/';
 
-    fetch('/_rgbw_swatch_data/', {
+    if (mode=='hsl') {
+        swatch.type = 'hsl';
+        endpoint = '/_hsl_swatch_data/';
+    }
+
+    fetch(endpoint, {
         method: 'PUT',
         headers: {
             'content-type': 'application/json'
@@ -450,9 +625,15 @@ function saveSwatch(swatch) {
 // Delete swatch from data storage.
 function deleteSwatch(swatch) {
     // Add type for parity with data model.
-    swatch.type = "rgbw";
+    swatch.type = 'rgbw';
+    var endpoint = '/_rgbw_swatch_data/';
 
-    fetch('/_rgbw_swatch_data/', {
+    if (mode=='hsl') {
+        swatch.type = 'hsl';
+        endpoint = '/_hsl_swatch_data/';
+    }
+
+    fetch(endpoint, {
         method: 'DELETE',
         headers: {
             'content-type': 'application/json'
@@ -465,13 +646,22 @@ function deleteSwatch(swatch) {
     );
 }
 
-// Get current state of colors array.
-function getColors() {
+// Get current state of colors array: RGBW.
+function getRGBWColors() {
     return {
         r: colors[0],
         g: colors[1],
         b: colors[2],
         w: colors[3]
+    }
+}
+
+// Get current state of colors array: HSL.
+function getHSLColors() {
+    return {
+        h: hsl[0],
+        s: hsl[1],
+        l: hsl[2]
     }
 }
 
@@ -503,7 +693,7 @@ function addGradientClickBinding() {
             headers: {
                 'content-type': 'application/json'
             },
-            body: JSON.stringify(getColors())
+            body: JSON.stringify(getRGBWColors())
         }).then(
             response => response.text()
         ).then(

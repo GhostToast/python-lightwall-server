@@ -28,6 +28,18 @@ body {
 #green-slider .noUi-connect { background: #27ae60; }
 #blue-slider .noUi-connect { background: #2980b9; }
 #white-slider .noUi-connect { background: #ffffff; }
+#hue-slider .noUi-connect { background: none; }
+#hue-slider .noUi-connects {
+    background: linear-gradient(0.25turn, #FF0000, #FFFF00, #00FF00, #00FFFF, #0000FF, #FF00FF, #FF0000);
+}
+#saturation-slider .noUi-connect { background: none; }
+#saturation-slider .noUi-connects {
+    background: linear-gradient(0.25turn, #808080, #FFFFFF);
+}
+#lightness-slider .noUi-connect { background: none; }
+#lightness-slider .noUi-connects {
+    background: linear-gradient(0.25turn, #000000, #FFFFFF);
+}
 
 .noUi-tooltip {
     display:none;

@@ -17,16 +17,59 @@ def index():
 # Route for fire.
 @app.route('/fire')
 def fire():
-    return render_template('fire.html')
+    initial_state = {
+        'type': 'rgbw',
+        'r': 0,
+        'g': 0,
+        'b': 0,
+        'w': 10
+    }
+
+    
+    state = get_state()
+    if (b'rgbw' == state[0]):
+        initial_state = {
+            'type': 'rgbw',
+            'r': state[1],
+            'g': state[2],
+            'b': state[3],
+            'w': state[4]
+            }
+            
+    # Supply swatches to front end.
+    swatch_query = Query()
+    swatches = db.search(swatch_query.type == 'rgbw')
+    return render_template('fire.html', swatches=swatches, initialState=initial_state)
 
 # Route to pause/play (with) fire.
-@app.route('/_fire/', methods=['POST'])
+@app.route('/_pause_fire/', methods=['POST'])
 def _fire():
     data = request.get_json()
 
-    request_string = ("<fire," + str(data['pause']) + ">")
+    request_string = ("<firepause," + str(data['pause']) + ">")
     print ("Sending: " + request_string)
 
+    # Send request.
+    ser = serial.Serial(TEENSY, 9600)
+    ser.write(request_string.encode('utf-8'))
+
+    # Send back simple response.
+    mode = ser.read()
+    return jsonify({'response': mode})
+
+# Route to send custom fire color.
+@app.route('/_post_fire_color/', methods=['POST'])
+def _post_fire_color():
+    data = request.get_json()
+    r = data['r']
+    g = data['g']
+    b = data['b']
+    w = data['w']
+
+    request_string = "<fire,"+str(r)+","+str(g)+","+str(b)+","+str(w)+">"
+
+    print ("Sending: " + request_string)
+    
     # Send request.
     ser = serial.Serial(TEENSY, 9600)
     ser.write(request_string.encode('utf-8'))
@@ -45,7 +88,7 @@ def matrix():
 def _pause_matrix():
     data = request.get_json()
  
-    request_string = ("<pause," + str(data['pause']) + ">")
+    request_string = ("<pausematrix," + str(data['pause']) + ">")
     print ("Sending: " + request_string)
 
     # Send request.
@@ -126,6 +169,76 @@ def _post_grade():
     mode = ser.read()
     return jsonify({'response': mode})
 
+# Route for HSL color picker.
+@app.route('/hsl-color')
+def hsl_color():
+    initial_state = {
+        'type': 'hsl',
+        'h':0,
+        's':10,
+        'l':10
+        }
+
+    state = get_state()
+    if (b'hsl' == state[0]):
+        initial_state = {
+            'type': 'hsl',
+            'h': state[1],
+            's': state[2],
+            'l': state[3]
+            }
+
+    # Supply swatches to front end.
+    swatch_query = Query()
+    swatches = db.search(swatch_query.type =='hsl')
+    return render_template('hsl-color.html', swatches=swatches, initialState=initial_state)
+
+# Endpoint for posting hsl color swatches (to update light wall).
+@app.route('/_post_hsl_color/', methods=['POST'])
+def _post_hsl_color():
+    data = request.get_json()
+    h = data['h']
+    s = data['s']
+    l = data['l']
+
+    request_string = "<hsl,"+str(h)+","+str(s)+","+str(l)+">"
+
+    print ("Sending: " + request_string)
+    
+    # Send request.
+    ser = serial.Serial(TEENSY, 9600)
+    ser.write(request_string.encode('utf-8'))
+
+    # Send back simple response.
+    mode = ser.read()
+    return jsonify({'response': mode})
+
+# Endpoint for saving or deleting HSL color swatches to data storage.
+@app.route('/_hsl_swatch_data/', methods=['PUT', 'DELETE'])
+def _hsl_swatch_data():
+    data = request.get_json()
+    status = 'failed';
+
+    print (data)
+    
+    if ('DELETE' == request.method):
+        swatch_query = Query()
+        record = db.remove(
+            (swatch_query.type == data['type']) &
+            (swatch_query.h == data['h']) &
+            (swatch_query.s == data['s']) &
+            (swatch_query.l == data['l'])
+            )
+        if (record):
+            status = 'record deleted'
+
+    if ('PUT' == request.method):
+        record = db.insert({'type': data['type'], 'h': data['h'], 's': data['s'], 'l': data['l']})
+        if (record):
+            status = 'record added'
+
+    return jsonify({'response': status})
+
 # Route for RGBW color picker.
 @app.route('/rgbw-color')
 def rgbw_color():
@@ -136,7 +249,6 @@ def rgbw_color():
         'b': 0,
         'w': 10
         }
-
     
     state = get_state()
     if (b'rgbw' == state[0]):
@@ -185,7 +297,7 @@ def _post_rgbw_color():
     return jsonify({'response': mode})
 
 
-# Endpoint for saving or deleting color swatches to data storage.
+# Endpoint for saving or deleting RGBW color swatches to data storage.
 @app.route('/_rgbw_swatch_data/', methods=['PUT', 'DELETE'])
 def _rgbw_swatch_data():
     data = request.get_json()
