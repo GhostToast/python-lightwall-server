@@ -22,6 +22,7 @@ if (window.location.pathname.indexOf('rgbw-color') == 1) {
 // Initialize HSL Color picker if on proper page.
 if (window.location.pathname.indexOf('hsl-color') == 1) {
     mode = 'hsl';
+    var hslButtons = document.getElementsByClassName('hsl-special');
     var sliders = document.getElementsByClassName('sliders');
     var swatchContainer = document.getElementById('swatch-container');
     var saveColor       = document.getElementById('save-color');
@@ -34,6 +35,7 @@ if (window.location.pathname.indexOf('hsl-color') == 1) {
     hslColorPicker();
     setInitialHSLState(); // Initialize a second time to get the hue into saturation slider.
     addSwatchSaveBinding();
+    addHSLModeClickBinding();
     addBodyClickBinding();
 }
 
@@ -65,7 +67,7 @@ if (window.location.pathname.indexOf('matrix') == 1) {
     var matrixButtons = document.getElementsByClassName('code-rain');
     var sliders = document.getElementsByClassName('sliders');
     var pauseMatrixButton = document.getElementById('pause-matrix');
-    var playMatrixButton = document.getElementById('play-matrix');o
+    var playMatrixButton = document.getElementById('play-matrix');
     var colors = [[0, 0], [0, 0], [0, 0], [0, 0]];
 
     addColorModeClickBinding();
@@ -139,6 +141,32 @@ function matrixColorSliders() {
                     'content-type': 'application/json'
                 },
                 body: JSON.stringify(colors)
+            }).then(
+                response => response.text()
+            ).then(
+                html => console.log(html)
+            );
+        });
+    });
+}
+
+function addHSLModeClickBinding() {
+    [].slice.call(hslButtons).forEach(function (button, index) {
+        button.addEventListener('click', function(e) {
+            var button = e.target.closest('button.hsl-special');
+            var special = parseInt(button.getAttribute('data-hsl-special'));
+            var swatchList = document.getElementsByClassName('swatch');
+            [].forEach.call(swatchList, function(el) {
+                el.classList.remove('active');
+            });
+            saveColor.style.display = 'none';
+            e.preventDefault();
+            fetch('/_post_hsl_special/', {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json'
+                },
+                body: JSON.stringify({special})
             }).then(
                 response => response.text()
             ).then(

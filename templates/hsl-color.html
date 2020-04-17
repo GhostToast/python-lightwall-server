@@ -5,6 +5,13 @@
                 initialState = JSON.parse('{{initialState | tojson | safe}}');
             </script>
             <h1>HSL Color</h1>
+            <h3>Special</h3>
+            <button type="button" class="btn bg-danger hsl-special" id="rainbow"
+                data-hsl-special="1"
+                >
+                <i class="material-icons red">code</i>
+            </button>
+            <h3>Customize</h3>
             <div id="preview-container">
                 <div id="preview" class="text-right">
                     <button type="button" class="btn btn-light" id="save-color">

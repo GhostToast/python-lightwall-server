@@ -207,6 +207,24 @@ def _post_hsl_color():
     mode = ser.read()
     return jsonify({'response': mode})
 
+# Endpoint for posting hsl color swatches (to update light wall).
+@app.route('/_post_hsl_special/', methods=['POST'])
+def _post_hsl_special():
+    data = request.get_json()
+    special = data['special']
+
+    request_string = "<specialhsl,"+str(special)+">"
+
+    print ("Sending: " + request_string)
+    
+    # Send request.
+    ser = serial.Serial(TEENSY, 9600)
+    ser.write(request_string.encode('utf-8'))
+
+    # Send back simple response.
+    mode = ser.read()
+    return jsonify({'response': mode})
+
 # Endpoint for saving or deleting HSL color swatches to data storage.
 @app.route('/_hsl_swatch_data/', methods=['PUT', 'DELETE'])
 def _hsl_swatch_data():
