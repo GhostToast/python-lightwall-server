@@ -18,27 +18,24 @@ def index():
 @app.route('/fire')
 def fire():
     initial_state = {
-        'type': 'rgbw',
-        'r': 0,
-        'g': 0,
-        'b': 0,
-        'w': 10
-    }
+        'type': 'hsl',
+        'h':0,
+        's':10,
+        'l':10
+        }
 
-    
     state = get_state()
-    if (b'rgbw' == state[0]):
+    if (b'fire' == state[0]):
         initial_state = {
-            'type': 'rgbw',
-            'r': state[1],
-            'g': state[2],
-            'b': state[3],
-            'w': state[4]
+            'type': 'hsl',
+            'h': state[1],
+            's': 100,
+            'l': 50
             }
-            
+
     # Supply swatches to front end.
     swatch_query = Query()
-    swatches = db.search(swatch_query.type == 'rgbw')
+    swatches = db.search(swatch_query.type =='hsl')
     return render_template('fire.html', swatches=swatches, initialState=initial_state)
 
 # Route to pause/play (with) fire.
@@ -61,12 +58,9 @@ def _fire():
 @app.route('/_post_fire_color/', methods=['POST'])
 def _post_fire_color():
     data = request.get_json()
-    r = data['r']
-    g = data['g']
-    b = data['b']
-    w = data['w']
+    h = data['h']
 
-    request_string = "<fire,"+str(r)+","+str(g)+","+str(b)+","+str(w)+">"
+    request_string = "<fire,"+str(h)+">"
 
     print ("Sending: " + request_string)
     

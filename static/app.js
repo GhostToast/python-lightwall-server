@@ -38,37 +38,39 @@ if (window.location.pathname.indexOf('hsl-color') == 1) {
 }
 
 if (window.location.pathname.indexOf('fire') == 1) {
-    //var sliders = document.getElementsByClassName('sliders');
-    //var swatchContainer = document.getElementById('swatch-container');
-    //var saveColor       = document.getElementById('save-color');
-    //var previewElement  = document.getElementById('preview');
-    //var colors = [0, 0, 0, 0];
+    mode = 'fire';
+    var fireButtons = document.getElementsByClassName('flames');
+    var sliders = document.getElementsByClassName('sliders');
+    var swatchContainer = document.getElementById('swatch-container');
+    var saveColor       = document.getElementById('save-color');
+    var previewElement  = document.getElementById('preview');
+    var hsl = [0, 0, 0];
 
     // Buttons
     var pauseFireButton = document.getElementById('pause-fire');
     var playFireButton = document.getElementById('play-fire');
 
-    //setInitialState();
-    //loadSwatches();
-    //rgbwColorPicker();
-    //addSwatchSaveBinding();
-    //addBodyClickBinding();
+    setInitialHueState();
+    loadSwatches();
+    hslColorPicker();
+    addSwatchSaveBinding();
+    addBodyClickBinding();
+    addFireModeClickBinding();
     addPausePlayFireButtonBinding();
-    mode = 'fire';
 }
 
 // Initialize Matrix if on proper page.
 if (window.location.pathname.indexOf('matrix') == 1) {
+    mode = 'matrix';
     var matrixButtons = document.getElementsByClassName('code-rain');
     var sliders = document.getElementsByClassName('sliders');
     var pauseMatrixButton = document.getElementById('pause-matrix');
-    var playMatrixButton = document.getElementById('play-matrix');
+    var playMatrixButton = document.getElementById('play-matrix');o
     var colors = [[0, 0], [0, 0], [0, 0], [0, 0]];
 
     addColorModeClickBinding();
     addPausePlayMatrixButtonBinding();
     matrixColorSliders();
-    mode = 'matrix';
 }
 
 // Initialize Gradient if on proper page.
@@ -137,6 +139,40 @@ function matrixColorSliders() {
                     'content-type': 'application/json'
                 },
                 body: JSON.stringify(colors)
+            }).then(
+                response => response.text()
+            ).then(
+                html => console.log(html)
+            );
+        });
+    });
+}
+
+function addFireModeClickBinding() {
+    [].slice.call(fireButtons).forEach(function (button, index) {
+        button.addEventListener('click', function(e) {
+            var button = e.target.closest('button.flames');
+            var h = parseInt(button.getAttribute('data-h'))
+            hsl = [
+                h,
+                100,
+                50
+            ];
+            var swatchList = document.getElementsByClassName('swatch');
+            [].forEach.call(swatchList, function(el) {
+                el.classList.remove('active');
+            });
+            [].slice.call(sliders).forEach(function (slider, index) {
+                slider.noUiSlider.setHandle(0, hsl[index], true);
+            });
+            saveColor.style.display = 'none';
+            e.preventDefault();
+            fetch('/_post_fire_color/', {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json'
+                },
+                body: JSON.stringify({h})
             }).then(
                 response => response.text()
             ).then(
@@ -258,6 +294,16 @@ function setInitialHSLState() {
     updateHSLPreview(getHSLColors());
 }
 
+// Load Hue color from server.
+function setInitialHueState() {
+    if (initialState.h) {
+        hsl[0] = initialState.h;
+        hsl[1] = 100;
+        hsl[2] = 50;
+    }
+    updateHSLPreview(getHSLColors());
+}
+
 // Load RGBW colors from server.
 function setInitialRGBWState() {
     if (initialState.r) {
@@ -337,6 +383,19 @@ function hslColorPicker() {
                 ).then(
                     html => console.log(html)
                 );
+            } else if (mode === 'fire') {
+                // Send color to server, to update light wall.
+                fetch('/_post_fire_color/', {
+                    method: 'POST',
+                    headers: {
+                        'content-type': 'application/json'
+                    },
+                    body: JSON.stringify({h: hslColors.h})
+                }).then(
+                    response => response.text()
+                ).then(
+                    html => console.log(html)
+                );
             }
         });
     });
@@ -409,14 +468,18 @@ function updateHSLPreview(hslcolors) {
     var previewColor = buildHSLPreviewColor(hslcolors);
     previewElement.style.background = previewColor;
     previewElement.style.color = previewColor;
-    var saturation = sliders[1].getElementsByClassName('noUi-connects');
-    var lightness = sliders[2].getElementsByClassName('noUi-connects');
-    if (saturation && saturation[0]) {
-        saturation[0].style.background = 'linear-gradient(0.25turn, #808080, hsl('+hsl[0]+', 100%, 50%))';
+
+    if (mode == 'hsl') {
+        var saturation = sliders[1].getElementsByClassName('noUi-connects');
+        var lightness = sliders[2].getElementsByClassName('noUi-connects');
+        if (saturation && saturation[0]) {
+            saturation[0].style.background = 'linear-gradient(0.25turn, #808080, hsl('+hsl[0]+', 100%, 50%))';
+        }
+        if (lightness && lightness[0]) {
+            lightness[0].style.background = 'linear-gradient(0.25turn, #000000, hsl('+hsl[0]+', 100%, 50%), #FFFFFF)';
+        }
     }
-    if (lightness && lightness[0]) {
-        lightness[0].style.background = 'linear-gradient(0.25turn, #000000, hsl('+hsl[0]+', 100%, 50%), #FFFFFF)';
-    }
+
 }
 
 // Update RGBW preview.
@@ -460,6 +523,14 @@ function addSwatch(swatch) {
         swatchElement.setAttribute('data-h', swatch.h);
         swatchElement.setAttribute('data-s', swatch.s);
         swatchElement.setAttribute('data-l', swatch.l);
+        swatchElement.addEventListener('click', swatchHSLClickHandler);
+    } else if (mode === 'fire') {
+        var styleColor = buildHSLPreviewColor(swatch);
+        swatchElement.style.background = styleColor;
+        swatchElement.setAttribute('data-h', swatch.h);
+        swatchElement.setAttribute('data-s', 100);
+        swatchElement.setAttribute('data-l', 50);
+        swatchElement.addEventListener('click', swatchHueClickHandler);
     } else {
         var styleColor = buildRGBWPreviewColor(swatch);
         swatchElement.style.background = styleColor;
@@ -467,9 +538,9 @@ function addSwatch(swatch) {
         swatchElement.setAttribute('data-g', swatch.g);
         swatchElement.setAttribute('data-b', swatch.b);
         swatchElement.setAttribute('data-w', swatch.w);
+        swatchElement.addEventListener('click', swatchRGBWClickHandler);
     }
-
-    swatchElement.addEventListener('click', swatchClickHandler);
+    
 
     swatchWrapper.appendChild(swatchElement)
     swatchContainer.insertBefore(swatchWrapper, swatchContainer.firstChild);
@@ -482,15 +553,24 @@ function buildHSLPreviewColor(hsl) {
         l: 0
     };
 
-    if (hsl.h) {
-        preview.h = parseInt(hsl.h, 10);
+    if (mode == 'hsl') {
+        if (hsl.h) {
+            preview.h = parseInt(hsl.h, 10);
+        }
+        if (hsl.s) {
+            preview.s = parseInt(hsl.s, 10);
+        }
+        if (hsl.l) {
+            preview.l = curveLightness(hsl.l);
+        }
+    } else if (mode == 'fire') {
+        if (hsl.h) {
+            preview.h = parseInt(hsl.h, 10);
+        }
+        preview.s = 100;
+        preview.l = 50;
     }
-    if (hsl.s) {
-        preview.s = parseInt(hsl.s, 10);
-    }
-    if (hsl.l) {
-        preview.l = curveLightness(hsl.l);
-    }
+    
 
     console.log(preview);
 
@@ -544,8 +624,50 @@ function curveLightness(lightness=0) {
     return lightness;
 }
 
-// Handle a swatch click.
-function swatchClickHandler(e) {
+// Handle Hue swatch click.
+function swatchHueClickHandler(e) {
+    var swatchList = document.getElementsByClassName('swatch');
+    [].forEach.call(swatchList, function(el) {
+        el.classList.remove('active');
+    });
+    e.target.classList.add('active');
+    
+    hsl = [
+        parseInt(e.target.getAttribute('data-h')),
+        100,
+        50
+    ];
+    [].slice.call(sliders).forEach(function (slider, index) {
+        slider.noUiSlider.setHandle(0, hsl[index], true);
+    });
+    saveColor.style.display = 'none';
+}
+
+// Handle HSL swatch click.
+function swatchHSLClickHandler(e) {
+    var swatchList = document.getElementsByClassName('swatch');
+    [].forEach.call(swatchList, function(el) {
+        el.classList.remove('active');
+    });
+    e.target.classList.add('active');
+    
+    hsl = [
+        parseInt(e.target.getAttribute('data-h')),
+        parseInt(e.target.getAttribute('data-s')),
+        parseInt(e.target.getAttribute('data-l'))
+    ];
+    var update = false;
+    [].slice.call(sliders).forEach(function (slider, index) {
+        if ( 2 == index ) {
+            update = true;
+        }
+        slider.noUiSlider.setHandle(0, hsl[index], update);
+    });
+    saveColor.style.display = 'none';
+}
+
+// Handle RGBW swatch click.
+function swatchRGBWClickHandler(e) {
     var swatchList = document.getElementsByClassName('swatch');
     [].forEach.call(swatchList, function(el) {
         el.classList.remove('active');
@@ -597,7 +719,7 @@ function swatchDeleteHandler(e) {
 function addSwatchSaveBinding() {
     saveColor.addEventListener('click', function(e) {
         saveColor.style.display = 'none';
-        if (mode === 'hsl') {
+        if (mode === 'hsl' || mode === 'fire') {
             swatch = getHSLColors();
         } else {
             swatch = getRGBWColors();
@@ -613,7 +735,7 @@ function saveSwatch(swatch) {
     swatch.type = 'rgbw';
     var endpoint = '/_rgbw_swatch_data/';
 
-    if (mode=='hsl') {
+    if (mode=='hsl' || mode=='fire') {
         swatch.type = 'hsl';
         endpoint = '/_hsl_swatch_data/';
     }
