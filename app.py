@@ -72,6 +72,24 @@ def _post_fire_color():
     mode = ser.read()
     return jsonify({'response': mode})
 
+# Endpoint for posting special .
+@app.route('/_post_fire_special/', methods=['POST'])
+def _post_fire_special():
+    data = request.get_json()
+    special = data['special']
+
+    request_string = "<specialfire,"+str(special)+">"
+
+    print ("Sending: " + request_string)
+    
+    # Send request.
+    ser = serial.Serial(TEENSY, 9600)
+    ser.write(request_string.encode('utf-8'))
+
+    # Send back simple response.
+    mode = ser.read()
+    return jsonify({'response': mode})
+
 # Route for matrix.
 @app.route('/matrix')
 def matrix():

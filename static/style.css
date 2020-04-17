@@ -29,7 +29,7 @@ body {
 #blue-slider .noUi-connect { background: #2980b9; }
 #white-slider .noUi-connect { background: #ffffff; }
 #hue-slider .noUi-connect { background: none; }
-#hue-slider .noUi-connects, .hsl-special {
+#hue-slider .noUi-connects, #rainbow  {
     background: linear-gradient(0.25turn, #FF0000, #FFFF00, #00FF00, #00FFFF, #0000FF, #FF00FF, #FF0000);
 }
 #saturation-slider .noUi-connect { background: none; }

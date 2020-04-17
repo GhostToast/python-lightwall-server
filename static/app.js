@@ -42,6 +42,7 @@ if (window.location.pathname.indexOf('hsl-color') == 1) {
 if (window.location.pathname.indexOf('fire') == 1) {
     mode = 'fire';
     var fireButtons = document.getElementsByClassName('flames');
+    var fireSpecialButtons = document.getElementsByClassName('flames-special');
     var sliders = document.getElementsByClassName('sliders');
     var swatchContainer = document.getElementById('swatch-container');
     var saveColor       = document.getElementById('save-color');
@@ -177,6 +178,24 @@ function addHSLModeClickBinding() {
 }
 
 function addFireModeClickBinding() {
+    [].slice.call(fireSpecialButtons).forEach(function (button, index) {
+        button.addEventListener('click', function(e) {
+            var button = e.target.closest('button.flames-special');
+            var special = parseInt(button.getAttribute('data-fire-special'));
+            e.preventDefault();
+            fetch('/_post_fire_special/', {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json'
+                },
+                body: JSON.stringify({special})
+            }).then(
+                response => response.text()
+            ).then(
+                html => console.log(html)
+            );
+        });
+    });
     [].slice.call(fireButtons).forEach(function (button, index) {
         button.addEventListener('click', function(e) {
             var button = e.target.closest('button.flames');
