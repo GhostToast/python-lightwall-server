@@ -1,4 +1,5 @@
 from flask import Flask, render_template, jsonify, request
+from flask_basicauth import BasicAuth
 from tinydb import TinyDB, Query
 import serial, json
 
@@ -7,6 +8,10 @@ TEENSY = '/dev/serial/by-id/usb-Teensyduino_USB_Serial_5220260-if00'
 
 # Instantiate our web server and database.
 app = Flask(__name__)
+app.config['BASIC_AUTH_USERNAME'] = 'ghost'
+app.config['BASIC_AUTH_PASSWORD'] = 'toast'
+app.config['BASIC_AUTH_FORCE'] = True
+basic_auth = BasicAuth(app)
 db = TinyDB('db.json')
 
 # Route for homepage.
@@ -357,4 +362,4 @@ def _rgbw_swatch_data():
 
 # Run locally, accessible via any device on network.
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0')
+    app.run(debug=False, host='0.0.0.0', port='8080')
