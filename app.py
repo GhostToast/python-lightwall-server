@@ -1,7 +1,7 @@
 from flask import Flask, render_template, jsonify, request
 from flask_basicauth import BasicAuth
 from tinydb import TinyDB, Query
-import io
+from decouple import config
 import serial, json
 
 # USB device, a Teensy 3.6 to send serial comms to.
@@ -9,8 +9,8 @@ TEENSY = '/dev/serial/by-id/usb-Teensyduino_USB_Serial_5220260-if00'
 
 # Instantiate our web server and database.
 app = Flask(__name__)
-app.config['BASIC_AUTH_USERNAME'] = os.getenv('AUTH_USER')
-app.config['BASIC_AUTH_PASSWORD'] = os.getenv('AUTH_PASS')
+app.config['BASIC_AUTH_USERNAME'] = config('AUTH_USER')
+app.config['BASIC_AUTH_PASSWORD'] = config('AUTH_PASS')
 app.config['BASIC_AUTH_FORCE'] = True
 basic_auth = BasicAuth(app)
 db = TinyDB('db.json')
