@@ -562,6 +562,21 @@ function rgbwColorPicker() {
                     html => console.log(html)
                 );
             }
+
+            if ( mode === 'life' ) {
+                // Send color to server, to update light wall.
+                fetch('/_post_life_color/', {
+                    method: 'POST',
+                    headers: {
+                        'content-type': 'application/json'
+                    },
+                    body: JSON.stringify(rgbw)
+                }).then(
+                    response => response.text()
+                ).then(
+                    html => console.log(html)
+                );
+            }
         });
     });
 }

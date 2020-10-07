@@ -46,6 +46,27 @@ def life():
     swatches = db.search(swatch_query.type == 'rgbw')
     return render_template('life.html', swatches=swatches, initialState=initial_state)
 
+# Endpoint for posting life color swatches (to set color for conway's game of life).
+@app.route('/_post_life_color/', methods=['POST'])
+def _post_life_color():
+    data = request.get_json()
+    r = data['r']
+    g = data['g']
+    b = data['b']
+    w = data['w']
+
+    request_string = "<life,"+str(r)+","+str(g)+","+str(b)+","+str(w)+">"
+
+    print ("Sending: " + request_string)
+    
+    # Send request.
+    ser = serial.Serial(TEENSY, 9600)
+    ser.write(request_string.encode('utf-8'))
+
+    # Send back simple response.
+    mode = ser.read()
+    return jsonify({'response': mode})
+
 # Route to pause/play Conway's Game of Life.
 @app.route('/_pause_life/', methods=['POST'])
 def _lifee():
