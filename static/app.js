@@ -1,6 +1,26 @@
 /* global swatches, initialState */
 
 var mode;
+if (window.location.pathname.indexOf('life') == 1) {
+    mode = 'life';
+    var sliders = document.getElementsByClassName('sliders');
+    var swatchContainer = document.getElementById('swatch-container');
+    var saveColor       = document.getElementById('save-color');
+    var previewElement  = document.getElementById('preview');
+    var colors = [0, 0, 0, 0];
+
+    // Buttons
+    var pauseLifeButton = document.getElementById('pause-life');
+    var playLifeButton = document.getElementById('play-life');
+
+    // Load for RGBW Color Picker.
+    setInitialRGBWState();
+    loadSwatches();
+    rgbwColorPicker();
+    addSwatchSaveBinding();
+    addBodyClickBinding();
+    addPausePlayLifeButtonBinding();
+}
 
 // Initialize RGBW Color picker if on proper page.
 if (window.location.pathname.indexOf('rgbw-color') == 1) {
@@ -252,6 +272,42 @@ function addColorModeClickBinding() {
                 html => console.log(html)
             );
         });
+    });
+}
+
+function addPausePlayLifeButtonBinding() {
+    playLifeButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        playLifeButton.style.display = 'none';
+        pauseLifeButton.style.display = 'block';
+        fetch('/_pause_life/', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify({pause: 0})
+        }).then(
+            response => response.text()
+        ).then(
+            html => console.log(html)
+        );
+    });
+
+    pauseLifeButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        pauseLifeButton.style.display = 'none';
+        playLifeButton.style.display = 'block';
+        fetch('/_pause_fire/', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify({pause: 1})
+        }).then(
+            response => response.text()
+        ).then(
+            html => console.log(html)
+        );
     });
 }
 

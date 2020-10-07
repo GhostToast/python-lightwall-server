@@ -82,10 +82,10 @@ body {
     margin-top: 12px;
 }
 
-#play-matrix {
+#pause-matrix,
+#pause-fire,
+#pause-life {
     display: none;
 }
 
-#pause-fire {
-    display: none;
-}
+
