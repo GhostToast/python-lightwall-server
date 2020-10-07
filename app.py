@@ -20,6 +20,48 @@ db = TinyDB('db.json')
 def index():
     return render_template('index.html')
 
+# Route for Conway's Game of Life.
+@app.route('/life')
+def life():
+    initial_state = {
+        'type': 'life',
+        'r': 0,
+        'g': 0,
+        'b': 0,
+        'w': 10
+        }
+    
+    state = get_state()
+    if (b'life' == state[0]):
+        initial_state = {
+            'type': 'life',
+            'r': state[1],
+            'g': state[2],
+            'b': state[3],
+            'w': state[4]
+            }
+            
+    # Supply swatches to front end.
+    swatch_query = Query()
+    swatches = db.search(swatch_query.type == 'rgbw')
+    return render_template('life.html', swatches=swatches, initialState=initial_state)
+
+# Route to pause/play Conway's Game of Life.
+@app.route('/_pause_life/', methods=['POST'])
+def _lifee():
+    data = request.get_json()
+
+    request_string = ("<lifepause," + str(data['pause']) + ">")
+    print ("Sending: " + request_string)
+
+    # Send request.
+    ser = serial.Serial(TEENSY, 9600)
+    ser.write(request_string.encode('utf-8'))
+
+    # Send back simple response.
+    mode = ser.read()
+    return jsonify({'response': mode})
+
 # Route for fire.
 @app.route('/fire')
 def fire():
