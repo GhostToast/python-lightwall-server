@@ -363,4 +363,4 @@ def _rgbw_swatch_data():
 
 # Run locally, accessible via any device on network.
 if __name__ == '__main__':
-    app.run(debug=False, host='0.0.0.0', port='8080')
+    app.run(debug=False, host='0.0.0.0', port=config('PORT'))
