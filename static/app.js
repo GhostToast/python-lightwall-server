@@ -297,7 +297,7 @@ function addPausePlayLifeButtonBinding() {
         e.preventDefault();
         pauseLifeButton.style.display = 'none';
         playLifeButton.style.display = 'block';
-        fetch('/_pause_fire/', {
+        fetch('/_pause_life/', {
             method: 'POST',
             headers: {
                 'content-type': 'application/json'
