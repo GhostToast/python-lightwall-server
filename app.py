@@ -382,9 +382,9 @@ def _post_rgbw_color():
     g = data['g']
     b = data['b']
     w = data['w']
-    m = data['m']
+    s = data['s']
 
-    request_string = "<rgbw,"+str(r)+","+str(g)+","+str(b)+","+str(w)+","+str(m)+">"
+    request_string = "<rgbw,"+str(r)+","+str(g)+","+str(b)+","+str(w)+","+str(s)+">"
 
     print ("Sending: " + request_string)
     

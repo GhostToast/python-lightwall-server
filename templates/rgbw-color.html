@@ -12,15 +12,10 @@
                     </button>
                 </div>
             </div>
-            <div class="dropdown">
-                <button class="btn btn-secondary dropdown-toggle" type="button" id="rgbwmode" data-toggle="dropdown" aria-expanded="false">
-                    Mode
-                </button>
-                <div class="dropdown-menu" aria-labelledby="rgbwmode">
-                    <a class="dropdown-item" href="#">Square</a>
-                    <a class="dropdown-item" href="#">Border</a>
-                </div>
-            </div>
+            <select class="form-control form-control-lg" name="rgbw-shape" id="rgbw-shape">
+              <option value="0">Full</option>
+              <option value="1">Perimeter</option>
+            </select>
             <div class="sliders" id="red-slider"></div>
             <div class="sliders" id="green-slider"/></div>
             <div class="sliders" id="blue-slider"/></div>

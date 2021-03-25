@@ -30,7 +30,7 @@ if (window.location.pathname.indexOf('rgbw-color') == 1) {
     var saveColor       = document.getElementById('save-color');
     var previewElement  = document.getElementById('preview');
     var colors = [0, 0, 0, 0];
-    var rgbwMode = 1;
+    var rgbwShape = document.getElementById('rgbw-shape');
 
     // Load for RGBW Color Picker.
     setInitialRGBWState();
@@ -903,7 +903,7 @@ function getRGBWColors() {
         g: colors[1],
         b: colors[2],
         w: colors[3],
-        m: rgbwMode || 0
+        s: rgbwShape.value || 0
     }
 }
 
