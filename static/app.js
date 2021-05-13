@@ -903,7 +903,7 @@ function getRGBWColors() {
         g: colors[1],
         b: colors[2],
         w: colors[3],
-        s: rgbwShape.value || 0
+        s: rgbwShape ? rgbwShape.value : 0
     }
 }
 
