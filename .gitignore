@@ -1,3 +1,4 @@
 # ignores
 db.json
 .env
+..env.swp
