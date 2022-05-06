@@ -15,6 +15,33 @@ app.config['BASIC_AUTH_FORCE'] = True
 basic_auth = BasicAuth(app)
 db = TinyDB('db.json')
 
+# Get state of Teensy, to set initial values to web app.
+def get_state():
+    # Request mode
+    ser = serial.Serial(TEENSY, 9600)
+    ser.write(("<state>").encode())
+
+    # Read response, remove whitespace and angle brackets.
+    mode = ser.readline().strip().strip(b'<>')
+    return mode.split(b',')
+
+def request_and_respond(request_string):
+    print ("Sending: " + request_string)
+
+    # Send request.
+    ser = serial.Serial(TEENSY, 9600)
+    ser.write(request_string.encode('utf-8'))
+
+    # Send back simple response.
+    mode = ser.read()
+    return jsonify({'response': mode})
+
+def load_template_with_swatches(template, swatch_type, initial_state):
+    # Supply swatches to front end.
+    swatch_query = Query()
+    swatches = db.search(swatch_query.type == swatch_type)
+    return render_template(template, swatches=swatches, initialState=initial_state)
+
 # Route for homepage.
 @app.route('/')
 def index():
@@ -25,63 +52,37 @@ def index():
 def life():
     initial_state = {
         'type': 'life',
-        'r': 0,
-        'g': 0,
-        'b': 0,
-        'w': 10
+        'h': 0,
+        's': 0,
+        'l': 0
         }
     
     state = get_state()
     if (b'life' == state[0]):
         initial_state = {
             'type': 'life',
-            'r': state[1],
-            'g': state[2],
-            'b': state[3],
-            'w': state[4]
+            'h': state[1],
+            's': state[2],
+            'l': state[3]
             }
-            
-    # Supply swatches to front end.
-    swatch_query = Query()
-    swatches = db.search(swatch_query.type == 'rgbw')
-    return render_template('life.html', swatches=swatches, initialState=initial_state)
+
+    return load_template_with_swatches('life.html', 'hsl', initial_state)
 
 # Endpoint for posting life color swatches (to set color for conway's game of life).
 @app.route('/_post_life_color/', methods=['POST'])
 def _post_life_color():
     data = request.get_json()
-    r = data['r']
-    g = data['g']
-    b = data['b']
-    w = data['w']
+    h = data['h']
+    s = data['s']
+    l = data['l']
 
-    request_string = "<life,"+str(r)+","+str(g)+","+str(b)+","+str(w)+">"
-
-    print ("Sending: " + request_string)
-    
-    # Send request.
-    ser = serial.Serial(TEENSY, 9600)
-    ser.write(request_string.encode('utf-8'))
-
-    # Send back simple response.
-    mode = ser.read()
-    return jsonify({'response': mode})
+    return request_and_respond("<life,"+str(h)+","+str(s)+","+str(l)+">");
 
 # Route to pause/play Conway's Game of Life.
 @app.route('/_pause_life/', methods=['POST'])
-def _lifee():
+def _life():
     data = request.get_json()
-
-    request_string = ("<lifepause," + str(data['pause']) + ">")
-    print ("Sending: " + request_string)
-
-    # Send request.
-    ser = serial.Serial(TEENSY, 9600)
-    ser.write(request_string.encode('utf-8'))
-
-    # Send back simple response.
-    mode = ser.read()
-    return jsonify({'response': mode})
+    return request_and_respond("<lifepause," + str(data['pause']) + ">")
 
 # Route for fire.
 @app.route('/fire')
@@ -102,62 +103,30 @@ def fire():
             'l': 50
             }
 
-    # Supply swatches to front end.
-    swatch_query = Query()
-    swatches = db.search(swatch_query.type =='hsl')
-    return render_template('fire.html', swatches=swatches, initialState=initial_state)
+    return load_template_with_swatches('fire.html', 'hsl', initial_state)
 
 # Route to pause/play (with) fire.
 @app.route('/_pause_fire/', methods=['POST'])
 def _fire():
     data = request.get_json()
 
-    request_string = ("<firepause," + str(data['pause']) + ">")
-    print ("Sending: " + request_string)
-
-    # Send request.
-    ser = serial.Serial(TEENSY, 9600)
-    ser.write(request_string.encode('utf-8'))
-
-    # Send back simple response.
-    mode = ser.read()
-    return jsonify({'response': mode})
+    return request_and_respond("<firepause," + str(data['pause']) + ">")
 
 # Route to send custom fire color.
 @app.route('/_post_fire_color/', methods=['POST'])
 def _post_fire_color():
     data = request.get_json()
     h = data['h']
-
-    request_string = "<fire,"+str(h)+">"
-
-    print ("Sending: " + request_string)
     
-    # Send request.
-    ser = serial.Serial(TEENSY, 9600)
-    ser.write(request_string.encode('utf-8'))
-
-    # Send back simple response.
-    mode = ser.read()
-    return jsonify({'response': mode})
+    return request_and_respond("<fire,"+str(h)+">")
 
 # Endpoint for posting special .
 @app.route('/_post_fire_special/', methods=['POST'])
 def _post_fire_special():
     data = request.get_json()
     special = data['special']
-
-    request_string = "<specialfire,"+str(special)+">"
-
-    print ("Sending: " + request_string)
     
-    # Send request.
-    ser = serial.Serial(TEENSY, 9600)
-    ser.write(request_string.encode('utf-8'))
-
-    # Send back simple response.
-    mode = ser.read()
-    return jsonify({'response': mode})
+    return request_and_respond("<specialfire,"+str(special)+">")
 
 # Route for matrix.
 @app.route('/matrix')
@@ -168,17 +137,8 @@ def matrix():
 @app.route('/_pause_matrix/', methods=['POST'])
 def _pause_matrix():
     data = request.get_json()
- 
-    request_string = ("<pausematrix," + str(data['pause']) + ">")
-    print ("Sending: " + request_string)
 
-    # Send request.
-    ser = serial.Serial(TEENSY, 9600)
-    ser.write(request_string.encode('utf-8'))
-
-    # Send back simple response.
-    mode = ser.read()
-    return jsonify({'response': mode})
+    return request_and_respond("<pausematrix," + str(data['pause']) + ">")
 
 # Endpoint for posting prebuilt matrix color mode.
 @app.route('/_post_matrix/', methods=['POST'])
@@ -196,13 +156,7 @@ def _post_matrix():
 
     print ("Sending: " + request_string)
     
-    # Send request.
-    ser = serial.Serial(TEENSY, 9600)
-    ser.write(request_string.encode('utf-8'))
-
-    # Send back simple response.
-    mode = ser.read()
-    return jsonify({'response': mode})
+    return request_and_respond(request_string)
 
 # Route for Gradient picker.
 @app.route('/gradient-color')
@@ -224,11 +178,8 @@ def gradient_color():
             'b': state[3],
             'w': state[4]
             }
-            
-    # Supply swatches to front end.
-    swatch_query = Query()
-    swatches = db.search(swatch_query.type == 'rgbw')
-    return render_template('gradient-color.html', swatches=swatches, initialState=initial_state)
+
+    return load_template_with_swatches('gradient-color.html', 'rgbw', initial_state)
 
 @app.route('/_post_gradient/', methods=['POST'])
 def _post_grade():
@@ -238,17 +189,7 @@ def _post_grade():
     b = data['b']
     w = data['w']
 
-    request_string = "<grade,"+str(r)+","+str(g)+","+str(b)+","+str(w)+">"
-
-    print ("Sending: " + request_string)
-    
-    # Send request.
-    ser = serial.Serial(TEENSY, 9600)
-    ser.write(request_string.encode('utf-8'))
-
-    # Send back simple response.
-    mode = ser.read()
-    return jsonify({'response': mode})
+    return request_and_respond("<grade,"+str(r)+","+str(g)+","+str(b)+","+str(w)+">")
 
 # Route for HSL color picker.
 @app.route('/hsl-color')
@@ -269,10 +210,7 @@ def hsl_color():
             'l': state[3]
             }
 
-    # Supply swatches to front end.
-    swatch_query = Query()
-    swatches = db.search(swatch_query.type =='hsl')
-    return render_template('hsl-color.html', swatches=swatches, initialState=initial_state)
+    return load_template_with_swatches('hsl-color.html', 'hsl', initial_state)
 
 # Endpoint for posting hsl color swatches (to update light wall).
 @app.route('/_post_hsl_color/', methods=['POST'])
@@ -282,17 +220,7 @@ def _post_hsl_color():
     s = data['s']
     l = data['l']
 
-    request_string = "<hsl,"+str(h)+","+str(s)+","+str(l)+">"
-
-    print ("Sending: " + request_string)
-    
-    # Send request.
-    ser = serial.Serial(TEENSY, 9600)
-    ser.write(request_string.encode('utf-8'))
-
-    # Send back simple response.
-    mode = ser.read()
-    return jsonify({'response': mode})
+    return request_and_respond("<hsl,"+str(h)+","+str(s)+","+str(l)+">")
 
 # Endpoint for posting hsl color swatches (to update light wall).
 @app.route('/_post_hsl_special/', methods=['POST'])
@@ -300,17 +228,7 @@ def _post_hsl_special():
     data = request.get_json()
     special = data['special']
 
-    request_string = "<specialhsl,"+str(special)+">"
-
-    print ("Sending: " + request_string)
-    
-    # Send request.
-    ser = serial.Serial(TEENSY, 9600)
-    ser.write(request_string.encode('utf-8'))
-
-    # Send back simple response.
-    mode = ser.read()
-    return jsonify({'response': mode})
+    return request_and_respond("<specialhsl,"+str(special)+">")
 
 # Endpoint for saving or deleting HSL color swatches to data storage.
 @app.route('/_hsl_swatch_data/', methods=['PUT', 'DELETE'])
@@ -358,21 +276,8 @@ def rgbw_color():
             'b': state[3],
             'w': state[4]
             }
-            
-    # Supply swatches to front end.
-    swatch_query = Query()
-    swatches = db.search(swatch_query.type == 'rgbw')
-    return render_template('rgbw-color.html', swatches=swatches, initialState=initial_state)
 
-# Get state of Teensy, to set initial values to web app.
-def get_state():
-    # Request mode
-    ser = serial.Serial(TEENSY, 9600)
-    ser.write(("<state>").encode())
-
-    # Read response, remove whitespace and angle brackets.
-    mode = ser.readline().strip().strip(b'<>')
-    return mode.split(b',')
+    return load_template_with_swatches('rgbw-color.html', 'rgbw', initial_state)
 
 # Endpoint for posting rgbw color swatches (to update light wall).
 @app.route('/_post_rgbw_color/', methods=['POST'])
@@ -384,17 +289,7 @@ def _post_rgbw_color():
     w = data['w']
     s = data['s']
 
-    request_string = "<rgbw,"+str(r)+","+str(g)+","+str(b)+","+str(w)+","+str(s)+">"
-
-    print ("Sending: " + request_string)
-    
-    # Send request.
-    ser = serial.Serial(TEENSY, 9600)
-    ser.write(request_string.encode('utf-8'))
-
-    # Send back simple response.
-    mode = ser.read()
-    return jsonify({'response': mode})
+    return request_and_respond("<rgbw,"+str(r)+","+str(g)+","+str(b)+","+str(w)+","+str(s)+">")
 
 
 # Endpoint for saving or deleting RGBW color swatches to data storage.
