@@ -33,7 +33,7 @@ def request_and_respond(request_string):
     ser.write(request_string.encode('utf-8'))
 
     # Send back simple response.
-    mode = ser.read()
+    mode = ser.readline().strip().strip(b'<>')
     return jsonify({'response': mode})
 
 def load_template_with_swatches(template, swatch_type, initial_state):
