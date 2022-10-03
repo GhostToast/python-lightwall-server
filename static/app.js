@@ -1,27 +1,6 @@
 /* global swatches, initialState */
 
 var mode;
-if (window.location.pathname.indexOf('life') == 1) {
-    mode = 'life';
-    var sliders = document.getElementsByClassName('sliders');
-    var swatchContainer = document.getElementById('swatch-container');
-    var saveColor       = document.getElementById('save-color');
-    var previewElement  = document.getElementById('preview');
-    var colors = [0, 0, 0, 0];
-
-    // Buttons
-    var pauseLifeButton = document.getElementById('pause-life');
-    var playLifeButton = document.getElementById('play-life');
-
-    // Load for RGBW Color Picker.
-    setInitialRGBWState();
-    loadSwatches();
-    rgbwColorPicker();
-    addSwatchSaveBinding();
-    addBodyClickBinding();
-    addPausePlayLifeButtonBinding();
-}
-
 // Initialize RGBW Color picker if on proper page.
 if (window.location.pathname.indexOf('rgbw-color') == 1) {
     mode = 'rgbw';
@@ -38,6 +17,28 @@ if (window.location.pathname.indexOf('rgbw-color') == 1) {
     rgbwColorPicker();
     addSwatchSaveBinding();
     addBodyClickBinding();
+}
+
+if (window.location.pathname.indexOf('life') == 1) {
+    mode = 'life';
+    var sliders = document.getElementsByClassName('sliders');
+    var swatchContainer = document.getElementById('swatch-container');
+    var saveColor       = document.getElementById('save-color');
+    var previewElement  = document.getElementById('preview');
+    var hsl = [0, 0, 0];
+
+    // Buttons
+    var pauseLifeButton = document.getElementById('pause-life');
+    var playLifeButton = document.getElementById('play-life');
+
+    // Load for HSL Color Picker.
+    setInitialHSLState();
+    loadSwatches();
+    hslColorPicker();
+    setInitialHSLState(); // Initialize a second time to get the hue into saturation slider.
+    addSwatchSaveBinding();
+    addBodyClickBinding();
+    addPausePlayLifeButtonBinding();
 }
 
 // Initialize HSL Color picker if on proper page.
@@ -500,6 +501,19 @@ function hslColorPicker() {
                 ).then(
                     html => console.log(html)
                 );
+            } else if (mode === 'life') {
+                // Send color to server, to update light wall.
+                fetch('/_post_life_color/', {
+                    method: 'POST',
+                    headers: {
+                        'content-type': 'application/json'
+                    },
+                    body: JSON.stringify(hslColors)
+                }).then(
+                    response => response.text()
+                ).then(
+                    html => console.log(html)
+                );
             }
         });
     });
@@ -563,21 +577,6 @@ function rgbwColorPicker() {
                     html => console.log(html)
                 );
             }
-
-            if ( mode === 'life' ) {
-                // Send color to server, to update light wall.
-                fetch('/_post_life_color/', {
-                    method: 'POST',
-                    headers: {
-                        'content-type': 'application/json'
-                    },
-                    body: JSON.stringify(rgbw)
-                }).then(
-                    response => response.text()
-                ).then(
-                    html => console.log(html)
-                );
-            }
         });
     });
 }
@@ -588,7 +587,7 @@ function updateHSLPreview(hslcolors) {
     previewElement.style.background = previewColor;
     previewElement.style.color = previewColor;
 
-    if (mode == 'hsl') {
+    if (mode == 'hsl' || mode == 'life') {
         var saturation = sliders[1].getElementsByClassName('noUi-connects');
         var lightness = sliders[2].getElementsByClassName('noUi-connects');
         if (saturation && saturation[0]) {
@@ -636,7 +635,7 @@ function addSwatch(swatch) {
     
     swatchElement.appendChild(swatchDelBtn);
 
-    if (mode === 'hsl') {
+    if (mode === 'hsl' || mode === 'life') {
         var styleColor = buildHSLPreviewColor(swatch);
         swatchElement.style.background = styleColor;
         swatchElement.setAttribute('data-h', swatch.h);
@@ -672,7 +671,7 @@ function buildHSLPreviewColor(hsl) {
         l: 0
     };
 
-    if (mode == 'hsl') {
+    if (mode == 'hsl' || mode == 'life') {
         if (hsl.h) {
             preview.h = parseInt(hsl.h, 10);
         }
@@ -814,7 +813,7 @@ function swatchDeleteHandler(e) {
     e.stopPropagation();
     var swatchToDelete = e.target.closest('div.swatch');
     var swatchWrapper = e.target.closest('div.swatch-wrapper');
-    if (mode=='hsl') {
+    if (mode == 'hsl' || mode == 'life') {
         var swatchData = {
             h: parseInt(swatchToDelete.getAttribute('data-h')),
             s: parseInt(swatchToDelete.getAttribute('data-s')),
@@ -838,7 +837,7 @@ function swatchDeleteHandler(e) {
 function addSwatchSaveBinding() {
     saveColor.addEventListener('click', function(e) {
         saveColor.style.display = 'none';
-        if (mode === 'hsl' || mode === 'fire') {
+        if (mode === 'hsl' || mode === 'fire' || mode === 'life') {
             swatch = getHSLColors();
         } else {
             swatch = getRGBWColors();
@@ -854,7 +853,7 @@ function saveSwatch(swatch) {
     swatch.type = 'rgbw';
     var endpoint = '/_rgbw_swatch_data/';
 
-    if (mode=='hsl' || mode=='fire') {
+    if (mode == 'hsl' || mode == 'fire' || mode == 'life') {
         swatch.type = 'hsl';
         endpoint = '/_hsl_swatch_data/';
     }
@@ -878,7 +877,7 @@ function deleteSwatch(swatch) {
     swatch.type = 'rgbw';
     var endpoint = '/_rgbw_swatch_data/';
 
-    if (mode=='hsl') {
+    if (mode == 'hsl' || mode == 'fire' || mode == 'life') {
         swatch.type = 'hsl';
         endpoint = '/_hsl_swatch_data/';
     }
