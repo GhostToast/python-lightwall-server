@@ -273,21 +273,22 @@ def scale(closes, height=CHART_H):
 
 def format_price(price):
     """
-    Fit a price into 4 glyphs, keeping as much precision as the magnitude
-    allows. The decimal point is implied rather than drawn -- a 1px dot between
-    panels would land in a strut.
+    Fit a price into 4 glyphs, as whole dollars.
 
-        73.18   -> '7318'   cents
-         7.31   -> '_731'   cents
-       336.21   -> '_336'   whole dollars
-      1234.50   -> '1234'   whole dollars
-     12345.00   -> '_12K'   thousands
+    No cents, deliberately. There is nowhere to put a decimal point -- a 1px dot
+    would fall in the margin between panels, where a wooden strut hides it -- and
+    an implied decimal does not read as one. '7448' looks like $7,448, not
+    $74.48. Whole dollars are unambiguous at a glance, which is the whole point
+    of a display you read from across the room.
+
+        74.48   -> '__74'
+       336.21   -> '_336'
+      1234.50   -> '1234'
+     12345.00   -> '_12K'   thousands, once 4 digits will not fit
     """
     if price is None:
         return PAD * TEXT_SLOTS
-    if price < 100:
-        text = str(int(round(price * 100)))
-    elif price < 10000:
+    if price < 10000:
         text = str(int(round(price)))
     else:
         text = str(int(round(price / 1000))) + 'K'
@@ -552,6 +553,7 @@ class Poller(threading.Thread):
         self._lock = threading.Lock()
         self._cache = None       # Last good {symbol, closes, price, fetched_at}.
         self._error = None
+        self._last_frame = None  # Suppresses redundant repaints; see push().
 
     # -- public API --
 
@@ -603,8 +605,15 @@ class Poller(threading.Thread):
             }
             self._error = None
 
+        # Only put a frame on the wire when it would actually change the wall.
+        # Prices often do not move between polls -- outside market hours they
+        # never do -- and the chart rounds to 32 rows, so most refreshes encode
+        # to a byte-identical frame. Skipping those keeps the panels untouched.
         if force or self._is_active():
-            self._send(build_frame(data['symbol'], data['closes'], data['price']))
+            frame = build_frame(data['symbol'], data['closes'], data['price'])
+            if force or frame != self._last_frame:
+                self._send(frame)
+                self._last_frame = frame
         return data
 
     # -- thread body --
@@ -644,8 +653,11 @@ class Poller(threading.Thread):
         if not cache:
             return
         try:
-            self._send(build_frame(cache['symbol'], cache['closes'],
-                                   cache['price'], stale=self._is_stale(cache)))
+            frame = build_frame(cache['symbol'], cache['closes'],
+                                cache['price'], stale=self._is_stale(cache))
+            if frame != self._last_frame:
+                self._send(frame)
+                self._last_frame = frame
         except (StockError, OSError):
             pass
 

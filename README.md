@@ -19,10 +19,18 @@ works without them.
 ## Stock mode
 
 `/stock` shows a 32 day sparkline for one ticker, with the symbol on the top row
-of panels and the current price on the bottom. The baseline is where the price
-sat 32 trading days ago; the filled area between it and the line is the move
-since, green above and red below. The rightmost column is today and breathes
-gently, so a live display is distinguishable from a frozen one.
+of panels and the current price, in whole dollars, on the bottom. The baseline is
+where the price sat 32 trading days ago; the filled area between it and the line
+is the move since, green above and red below.
+
+Prices show no cents. There is nowhere to put a decimal point -- a 1px dot falls
+in the margin between panels, where a strut hides it -- and an implied decimal
+misreads: `7448` looks like $7,448 rather than $74.48.
+
+It is a still image. The wall repaints only when the data actually changes, and
+the server does not even send a frame unless it would look different, so most
+refreshes touch nothing at all. Nothing fades, pulses or animates -- at this
+brightness any movement is distracting rather than informative.
 
 Prices come from Yahoo's chart endpoint, which needs no API key but does need a
 browser `User-Agent` header -- without one it answers 429. One call returns both
