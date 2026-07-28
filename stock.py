@@ -142,7 +142,12 @@ class StockError(Exception):
 def _get_json(url):
     request = urllib.request.Request(url, headers={'User-Agent': USER_AGENT})
     with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
-        return json.load(response)
+        # Decode explicitly rather than handing the raw stream to json.load().
+        # urlopen yields bytes, and json only started accepting those in Python
+        # 3.6 -- on 3.5 it raises "the JSON object must be str, not 'bytes'".
+        charset = response.headers.get_content_charset() or 'utf-8'
+        body = response.read()
+    return json.loads(body.decode(charset))
 
 
 def yahoo(symbol):
