@@ -15,15 +15,24 @@ Run standalone to see the layout without touching the hardware:
     python3 stock.py TSLA PFE GOOGL NOTAREALTICKER
 """
 
+import sys
+
+# Fail loudly and specifically rather than with a confusing stdlib import error.
+# Under Python 2 "import urllib.error" reports 'No module named error', which
+# gives no hint that the interpreter is the real problem.
+if sys.version_info[0] < 3:
+    raise ImportError(
+        'stock.py requires Python 3; this is %s. Start the server with '
+        'python3 (and install its dependencies for python3).'
+        % '.'.join(str(n) for n in sys.version_info[:3]))
+
 import json
 import os
-import sys
 import threading
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, time as dt_time
-from zoneinfo import ZoneInfo
+from datetime import datetime, timedelta, time as dt_time
 
 # python-decouple is already a project dependency and reads .env, but we fall
 # back to the environment so this module still runs standalone for previews.
@@ -456,7 +465,15 @@ def render_ascii(frame):
 
 # --- Polling ---------------------------------------------------------------
 
-MARKET_TZ = ZoneInfo('America/New_York')
+# zoneinfo is stdlib from 3.9. On anything older, fall back to computing the US
+# Eastern offset from the DST rule directly -- it is only a handful of lines and
+# saves requiring pytz just to decide whether the market is open.
+try:
+    from zoneinfo import ZoneInfo
+    MARKET_TZ = ZoneInfo('America/New_York')
+except ImportError:  # pragma: no cover - only on Python < 3.9
+    MARKET_TZ = None
+
 MARKET_OPEN = dt_time(9, 30)
 MARKET_CLOSE = dt_time(16, 0)
 
@@ -466,16 +483,43 @@ MAX_BACKOFF = 1800         # Ceiling for error backoff.
 STALE_AFTER = 3600         # Data older than this is flagged on the wall.
 
 
+def _eastern_offset(utc):
+    """
+    Hours to add to UTC to get US Eastern. Daylight saving runs from 2am on the
+    second Sunday in March to 2am on the first Sunday in November.
+    """
+    def first_sunday(year, month):
+        # weekday() is Monday 0 .. Sunday 6.
+        return 1 + (6 - datetime(year, month, 1).weekday()) % 7
+
+    year = utc.year
+    starts = datetime(year, 3, first_sunday(year, 3) + 7, 7)  # 2am EST is 7am UTC
+    ends = datetime(year, 11, first_sunday(year, 11), 6)      # 2am EDT is 6am UTC
+    return -4 if starts <= utc < ends else -5
+
+
+def market_now():
+    """Current wall-clock time in New York, as a naive datetime."""
+    if MARKET_TZ is not None:
+        return datetime.now(MARKET_TZ).replace(tzinfo=None)
+    utc = datetime.utcnow()
+    return utc + timedelta(hours=_eastern_offset(utc))
+
+
 def is_market_hours(now=None):
     """
     Weekday and clock check against US market hours. Deliberately ignores
     market holidays: polling on Thanksgiving is harmless, since the provider
     just returns the previous close.
     """
-    now = now or datetime.now(MARKET_TZ)
+    if now is None:
+        now = market_now()
+    elif now.tzinfo is not None:
+        now = (now.astimezone(MARKET_TZ) if MARKET_TZ else now).replace(tzinfo=None)
+
     if now.weekday() >= 5:
         return False
-    return MARKET_OPEN <= now.timetz().replace(tzinfo=None) <= MARKET_CLOSE
+    return MARKET_OPEN <= now.time() <= MARKET_CLOSE
 
 
 class Poller(threading.Thread):
