@@ -48,6 +48,13 @@ def send(request_string):
         for attempt in (1, 2):
             try:
                 port = _port()
+                # Drop anything still sitting in the buffer before writing. A
+                # <state> request actually produces two lines -- the state reply
+                # from processState, then the mode number from respondToServer --
+                # and we only read one. Without this, that leftover line becomes
+                # the next command's acknowledgement and every reply after it is
+                # off by one.
+                port.reset_input_buffer()
                 port.write(request_string.encode('utf-8'))
                 return port.readline().strip().strip(b'<>')
             except (serial.SerialException, OSError):

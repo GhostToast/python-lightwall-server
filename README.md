@@ -92,6 +92,23 @@ To iterate on the layout without the hardware:
     python3 stock.py NYT
     python3 stock.py TSLA PFE GOOGL
 
+## Cutting power to the LEDs
+
+The LED strips are powered separately from the Teensy, so the LEDs can be switched
+off and on while the sketch keeps running. The SK6812s hold their frame in their
+own registers and come back dark, which matters for the two static modes: they
+draw only when their data changes, so nothing would ever redraw and the wall would
+stay dark until the next update arrived.
+
+Both therefore re-latch the existing frame on a slow timer -- see
+`refreshStaticFrame()` in `lightwall.ino`. It re-sends the buffer the Teensy
+already holds without recomputing anything, so the wall restores itself within a
+fraction of a second of power returning.
+
+Doing it in the firmware rather than the server also means it holds when nothing
+is arriving at all: overnight, at the weekend, or any time after the market closes
+and prices stop moving.
+
 ## Sprite mode
 
 `/sprites` puts one 8x8 sprite in each of the wall's sixteen panels. This is the
