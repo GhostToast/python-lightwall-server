@@ -2,10 +2,13 @@ from flask import Flask, render_template, jsonify, request
 from flask_basicauth import BasicAuth
 from tinydb import TinyDB, Query
 from decouple import config
-import serial, json
+import serial, json, threading
+
+import stock
 
 # USB device, a Teensy 3.6 to send serial comms to.
 TEENSY = '/dev/serial/by-id/usb-Teensyduino_USB_Serial_5220260-if00'
+BAUD = 9600
 
 # Instantiate our web server and database.
 app = Flask(__name__)
@@ -15,26 +18,82 @@ app.config['BASIC_AUTH_FORCE'] = True
 basic_auth = BasicAuth(app)
 db = TinyDB('db.json')
 
+# One serial handle for the whole process, opened on first use and reused.
+#
+# This used to open a fresh serial.Serial() on every request and never close it,
+# which leaked a file descriptor per request. That was survivable when only a
+# human clicking buttons ever talked to the wall, but the stock poller sends a
+# frame every minute unattended, so the leak would become hundreds of
+# descriptors a day. The lock matters for the same reason: a poll and a user
+# request landing together would otherwise interleave their bytes mid-frame and
+# the Teensy would parse the result as garbage.
+_serial = None
+_serial_lock = threading.Lock()
+
+def _port():
+    global _serial
+    if _serial is None or not _serial.is_open:
+        _serial = serial.Serial(TEENSY, BAUD, timeout=2)
+    return _serial
+
+def send(request_string):
+    """
+    Put one command on the wire and return the Teensy's acknowledgement.
+
+    Reconnects once if the port has gone away -- unplugging and replugging the
+    Teensy should not require restarting the server.
+    """
+    global _serial
+    with _serial_lock:
+        for attempt in (1, 2):
+            try:
+                port = _port()
+                port.write(request_string.encode('utf-8'))
+                return port.readline().strip().strip(b'<>')
+            except (serial.SerialException, OSError):
+                if _serial is not None:
+                    try:
+                        _serial.close()
+                    except Exception:
+                        pass
+                _serial = None
+                if attempt == 2:
+                    raise
+
 # Get state of Teensy, to set initial values to web app.
 def get_state():
-    # Request mode
-    ser = serial.Serial(TEENSY, 9600)
-    ser.write(("<state>").encode())
-
-    # Read response, remove whitespace and angle brackets.
-    mode = ser.readline().strip().strip(b'<>')
-    return mode.split(b',')
+    try:
+        return send("<state>").split(b',')
+    except (serial.SerialException, OSError) as error:
+        print("Could not read state: %s" % error)
+        return [b'']
 
 def request_and_respond(request_string):
     print ("Sending: " + request_string)
 
-    # Send request.
-    ser = serial.Serial(TEENSY, 9600)
-    ser.write(request_string.encode('utf-8'))
+    try:
+        mode = send(request_string)
+    except (serial.SerialException, OSError) as error:
+        return jsonify({'error': str(error)}), 503
 
-    # Send back simple response.
-    mode = ser.readline().strip().strip(b'<>')
+    # Remember which mode the wall is on, so the stock poller knows whether it
+    # is allowed to draw. Without this it would happily overwrite fire or life.
+    _note_active_mode(request_string)
+
     return jsonify({'response': mode})
+
+# --- Active mode tracking -------------------------------------------------
+
+# The command name most recently sent. The poller only pushes when this is a
+# stock command, so selecting another mode in the UI silently parks it.
+_active_command = None
+
+def _note_active_mode(request_string):
+    global _active_command
+    _active_command = request_string.lstrip('<').split(',')[0].rstrip('>')
+
+def stock_is_active():
+    return _active_command in ('stock', 'stockpause')
 
 def load_template_with_swatches(template, swatch_type, initial_state):
     # Supply swatches to front end.
@@ -318,8 +377,100 @@ def _rgbw_swatch_data():
             status = 'record added'
 
     return jsonify({'response': status})
-        
+
+
+# --- Stock chart ----------------------------------------------------------
+
+# The chosen symbol lives in TinyDB alongside the color swatches, so it survives
+# a restart. Only ever one record of this type.
+def get_stock_symbol():
+    record = db.get(Query().type == 'stock')
+    return record['symbol'] if record else ''
+
+def set_stock_symbol(symbol):
+    query = Query()
+    if db.get(query.type == 'stock'):
+        db.update({'symbol': symbol}, query.type == 'stock')
+    else:
+        db.insert({'type': 'stock', 'symbol': symbol})
+
+# Refreshes the wall while it is on stock mode. Collaborators are passed in so
+# stock.py never has to import this module back.
+poller = stock.Poller(
+    send=send,
+    get_symbol=get_stock_symbol,
+    is_active=stock_is_active,
+    )
+
+# Route for the stock chart.
+@app.route('/stock')
+def stock_page():
+    initial_state = {
+        'type': 'stock',
+        'symbol': get_stock_symbol(),
+        'paused': 0,
+        }
+
+    state = get_state()
+    if (b'stock' == state[0] and len(state) > 1):
+        initial_state['paused'] = int(state[1])
+
+    return render_template('stock.html', initialState=initial_state)
+
+# Endpoint for choosing which symbol to display.
+@app.route('/_post_stock/', methods=['POST'])
+def _post_stock():
+    data = request.get_json()
+    symbol = stock.normalize_symbol(data.get('symbol', ''))
+    if not symbol:
+        return jsonify({'error': 'Enter a ticker symbol.'}), 400
+
+    # Fetch before persisting, so a typo is reported rather than saved. force
+    # sends the frame even though the wall is not on stock mode yet, which is
+    # what actually switches it over.
+    try:
+        result = poller.push(symbol, force=True)
+    except stock.StockError as error:
+        return jsonify({'error': str(error)}), 400
+    except (serial.SerialException, OSError) as error:
+        return jsonify({'error': str(error)}), 503
+
+    set_stock_symbol(symbol)
+    _note_active_mode('<stock')
+
+    # Picking a symbol is a deliberate act, so make sure it is actually visible.
+    # The firmware leaves the pause flag alone on incoming frames (see
+    # processStock) precisely so the poller cannot do this behind the user's
+    # back, which means an explicit resume belongs here.
+    try:
+        send("<stockpause,0>")
+        _note_active_mode('<stock')
+    except (serial.SerialException, OSError):
+        pass
+
+    return jsonify({
+        'response': 'ok',
+        'symbol': result['symbol'],
+        'price': result['price'],
+        'currency': result.get('currency', 'USD'),
+        'closes': result['closes'],
+        })
+
+# Route to pause/play the stock chart.
+@app.route('/_pause_stock/', methods=['POST'])
+def _pause_stock():
+    data = request.get_json()
+    return request_and_respond("<stockpause," + str(data['pause']) + ">")
+
+# Endpoint for the web UI's preview, which renders the same layout as the wall.
+@app.route('/_stock_data/')
+def _stock_data():
+    snapshot = poller.snapshot()
+    snapshot['symbol'] = get_stock_symbol()
+    return jsonify(snapshot)
+
 
 # Run locally, accessible via any device on network.
 if __name__ == '__main__':
+    poller.start()
     app.run(debug=False, host='0.0.0.0', port=config('PORT'))

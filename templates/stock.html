@@ -1,0 +1,29 @@
+{% include '_header.html' %}
+
+            <script>
+                initialState = JSON.parse('{{initialState | tojson | safe}}');
+            </script>
+            <h1>Stock</h1>
+            <button type="button" class="btn bg-warning" id="pause-stock">
+                <i class="material-icons">pause</i>
+            </button>
+            <button type="button" class="btn bg-warning" id="play-stock">
+                <i class="material-icons">play_arrow</i>
+            </button>
+
+            <form id="stock-form" class="form-inline my-3">
+                <input type="text" class="form-control mr-2" id="stock-symbol"
+                       placeholder="NYT" maxlength="12" autocapitalize="characters"
+                       autocomplete="off" aria-label="Ticker symbol">
+                <button type="submit" class="btn btn-light" id="set-symbol">
+                    <i class="material-icons">show_chart</i>
+                </button>
+            </form>
+
+            <p id="stock-status"></p>
+
+            <!-- Mirrors what the wall draws, struts and all, so the layout can be
+                 checked without standing in front of it. -->
+            <canvas id="stock-preview" width="330" height="330"></canvas>
+
+{% include '_footer.html' %}

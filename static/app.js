@@ -41,6 +41,26 @@ if (window.location.pathname.indexOf('life') == 1) {
     addPausePlayLifeButtonBinding();
 }
 
+if (window.location.pathname.indexOf('stock') == 1) {
+    mode = 'stock';
+
+    // Buttons
+    var pauseStockButton = document.getElementById('pause-stock');
+    var playStockButton = document.getElementById('play-stock');
+    var stockForm = document.getElementById('stock-form');
+    var stockSymbol = document.getElementById('stock-symbol');
+    var stockStatus = document.getElementById('stock-status');
+    var stockPreview = document.getElementById('stock-preview');
+
+    setInitialStockState();
+    addStockSymbolBinding();
+    addPausePlayStockButtonBinding();
+    loadStockPreview();
+
+    // The poller refreshes during market hours, so keep the preview in step.
+    setInterval(loadStockPreview, 60000);
+}
+
 // Initialize HSL Color picker if on proper page.
 if (window.location.pathname.indexOf('hsl-color') == 1) {
     mode = 'hsl';
@@ -311,6 +331,142 @@ function addPausePlayLifeButtonBinding() {
             html => console.log(html)
         );
     });
+}
+
+function setInitialStockState() {
+    stockSymbol.value = initialState.symbol || '';
+    if (initialState.paused == 1) {
+        pauseStockButton.style.display = 'none';
+        playStockButton.style.display = 'block';
+    } else {
+        playStockButton.style.display = 'none';
+        pauseStockButton.style.display = 'block';
+    }
+}
+
+function addStockSymbolBinding() {
+    stockForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var symbol = stockSymbol.value.trim().toUpperCase();
+        if (!symbol) {
+            return;
+        }
+        stockSymbol.value = symbol;
+        stockStatus.textContent = 'Fetching ' + symbol + '...';
+
+        fetch('/_post_stock/', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify({symbol: symbol})
+        }).then(function(response) {
+            return response.json().then(function(body) {
+                return {ok: response.ok, body: body};
+            });
+        }).then(function(result) {
+            if (!result.ok) {
+                stockStatus.textContent = result.body.error || 'Could not load that symbol.';
+                return;
+            }
+            stockStatus.textContent = result.body.symbol + ' ' +
+                result.body.price + ' ' + result.body.currency;
+            // The server resumes the wall when a symbol is chosen, so the
+            // buttons need to agree with it.
+            playStockButton.style.display = 'none';
+            pauseStockButton.style.display = 'block';
+            loadStockPreview();
+        });
+    });
+}
+
+function addPausePlayStockButtonBinding() {
+    playStockButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        playStockButton.style.display = 'none';
+        pauseStockButton.style.display = 'block';
+        fetch('/_pause_stock/', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify({pause: 0})
+        }).then(
+            response => response.text()
+        ).then(
+            html => console.log(html)
+        );
+    });
+
+    pauseStockButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        pauseStockButton.style.display = 'none';
+        playStockButton.style.display = 'block';
+        fetch('/_pause_stock/', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify({pause: 1})
+        }).then(
+            response => response.text()
+        ).then(
+            html => console.log(html)
+        );
+    });
+}
+
+function loadStockPreview() {
+    fetch('/_stock_data/').then(
+        response => response.json()
+    ).then(function(snapshot) {
+        if (snapshot.error) {
+            stockStatus.textContent = snapshot.error;
+        }
+        if (snapshot.data && snapshot.data.cells) {
+            drawStockPreview(snapshot.data.cells, snapshot.data.stale);
+        }
+    });
+}
+
+/**
+ * Paint what the wall is drawing.
+ *
+ * The server sends a 32x32 grid of tokens rather than raw prices, so the font
+ * and the layout rules stay in one place -- this only has to know which color
+ * each token is. Panel gaps are drawn as gaps so the preview reads like the
+ * physical wall, struts included.
+ */
+function drawStockPreview(cells, stale) {
+    var colors = {
+        ' ': '#0a0a0a',
+        'g': '#0b3d1a', // gain fill
+        'G': '#2fd45f', // gain line
+        'r': '#3d0b0b', // loss fill
+        'R': '#f4564f', // loss line
+        '-': '#4a4a4a', // baseline
+        '@': '#f2f2f2'  // text
+    };
+
+    var context = stockPreview.getContext('2d');
+    var cell = 9;   // Pixel size in the preview.
+    var strut = 3;  // Drawn gap between panels.
+
+    context.fillStyle = '#000';
+    context.fillRect(0, 0, stockPreview.width, stockPreview.height);
+    context.globalAlpha = stale ? 0.45 : 1;
+
+    for (var y = 0; y < cells.length; y++) {
+        for (var x = 0; x < cells[y].length; x++) {
+            context.fillStyle = colors[cells[y][x]] || colors[' '];
+            context.fillRect(
+                x * cell + Math.floor(x / 8) * strut,
+                y * cell + Math.floor(y / 8) * strut,
+                cell - 1, cell - 1);
+        }
+    }
+
+    context.globalAlpha = 1;
 }
 
 function addPausePlayFireButtonBinding() {
