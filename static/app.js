@@ -44,17 +44,15 @@ if (window.location.pathname.indexOf('life') == 1) {
 if (window.location.pathname.indexOf('stock') == 1) {
     mode = 'stock';
 
-    // Buttons
-    var pauseStockButton = document.getElementById('pause-stock');
-    var playStockButton = document.getElementById('play-stock');
     var stockForm = document.getElementById('stock-form');
     var stockSymbol = document.getElementById('stock-symbol');
     var stockStatus = document.getElementById('stock-status');
     var stockPreview = document.getElementById('stock-preview');
 
-    setInitialStockState();
+    // There is no pause control here, unlike the animated modes -- this chart is
+    // a still image, so there is nothing to pause.
+    stockSymbol.value = initialState.symbol || '';
     addStockSymbolBinding();
-    addPausePlayStockButtonBinding();
     loadStockPreview();
 
     // The poller refreshes during market hours, so keep the preview in step.
@@ -333,17 +331,6 @@ function addPausePlayLifeButtonBinding() {
     });
 }
 
-function setInitialStockState() {
-    stockSymbol.value = initialState.symbol || '';
-    if (initialState.paused == 1) {
-        pauseStockButton.style.display = 'none';
-        playStockButton.style.display = 'block';
-    } else {
-        playStockButton.style.display = 'none';
-        pauseStockButton.style.display = 'block';
-    }
-}
-
 function addStockSymbolBinding() {
     stockForm.addEventListener('submit', function(e) {
         e.preventDefault();
@@ -371,48 +358,8 @@ function addStockSymbolBinding() {
             }
             stockStatus.textContent = result.body.symbol + ' ' +
                 result.body.price + ' ' + result.body.currency;
-            // The server resumes the wall when a symbol is chosen, so the
-            // buttons need to agree with it.
-            playStockButton.style.display = 'none';
-            pauseStockButton.style.display = 'block';
             loadStockPreview();
         });
-    });
-}
-
-function addPausePlayStockButtonBinding() {
-    playStockButton.addEventListener('click', function(e) {
-        e.preventDefault();
-        playStockButton.style.display = 'none';
-        pauseStockButton.style.display = 'block';
-        fetch('/_pause_stock/', {
-            method: 'POST',
-            headers: {
-                'content-type': 'application/json'
-            },
-            body: JSON.stringify({pause: 0})
-        }).then(
-            response => response.text()
-        ).then(
-            html => console.log(html)
-        );
-    });
-
-    pauseStockButton.addEventListener('click', function(e) {
-        e.preventDefault();
-        pauseStockButton.style.display = 'none';
-        playStockButton.style.display = 'block';
-        fetch('/_pause_stock/', {
-            method: 'POST',
-            headers: {
-                'content-type': 'application/json'
-            },
-            body: JSON.stringify({pause: 1})
-        }).then(
-            response => response.text()
-        ).then(
-            html => console.log(html)
-        );
     });
 }
 
@@ -438,22 +385,34 @@ function loadStockPreview() {
  * physical wall, struts included.
  */
 function drawStockPreview(cells, stale) {
+    // Approximates the firmware palette in lightwall.ino -- teal gains, amber
+    // losses, neutral white for the baseline and text. Keep these in step with
+    // the stock* colour constants there, or the preview stops being a useful
+    // proxy for the wall.
     var colors = {
-        ' ': '#0a0a0a',
-        'g': '#0b3d1a', // gain fill
-        'G': '#2fd45f', // gain line
-        'r': '#3d0b0b', // loss fill
-        'R': '#f4564f', // loss line
-        '-': '#4a4a4a', // baseline
-        '@': '#f2f2f2'  // text
+        ' ': '#080808',
+        'g': '#0a2b28', // gain fill  - teal, dim
+        'G': '#3fbfb0', // gain line  - teal
+        'r': '#2e2109', // loss fill  - amber, dim
+        'R': '#d69433', // loss line  - amber
+        '-': '#3a3a3a', // baseline   - neutral white channel
+        '@': '#cfcfcf'  // text       - neutral white channel
     };
 
     var context = stockPreview.getContext('2d');
     var cell = 9;   // Pixel size in the preview.
     var strut = 3;  // Drawn gap between panels.
+    var gap = 1;    // Space between pixels, so individual LEDs read as dots.
+
+    // Size the canvas to exactly what gets drawn: 32 pixels, plus a strut after
+    // each of the first three panels. Derived rather than hardcoded so it cannot
+    // drift out of step with the metrics above and leave a dead margin.
+    var extent = 32 * cell + 3 * strut - gap;
+    stockPreview.width = extent;
+    stockPreview.height = extent;
 
     context.fillStyle = '#000';
-    context.fillRect(0, 0, stockPreview.width, stockPreview.height);
+    context.fillRect(0, 0, extent, extent);
     context.globalAlpha = stale ? 0.45 : 1;
 
     for (var y = 0; y < cells.length; y++) {
@@ -462,7 +421,7 @@ function drawStockPreview(cells, stale) {
             context.fillRect(
                 x * cell + Math.floor(x / 8) * strut,
                 y * cell + Math.floor(y / 8) * strut,
-                cell - 1, cell - 1);
+                cell - gap, cell - gap);
         }
     }
 

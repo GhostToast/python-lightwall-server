@@ -93,7 +93,7 @@ def _note_active_mode(request_string):
     _active_command = request_string.lstrip('<').split(',')[0].rstrip('>')
 
 def stock_is_active():
-    return _active_command in ('stock', 'stockpause')
+    return _active_command == 'stock'
 
 def load_template_with_swatches(template, swatch_type, initial_state):
     # Supply swatches to front end.
@@ -405,15 +405,13 @@ poller = stock.Poller(
 # Route for the stock chart.
 @app.route('/stock')
 def stock_page():
+    # No get_state() call here: the symbol comes from the database, and there is
+    # nothing else about this mode the Teensy knows better than we do. Skipping it
+    # keeps the page load off the serial port entirely.
     initial_state = {
         'type': 'stock',
         'symbol': get_stock_symbol(),
-        'paused': 0,
         }
-
-    state = get_state()
-    if (b'stock' == state[0] and len(state) > 1):
-        initial_state['paused'] = int(state[1])
 
     return render_template('stock.html', initialState=initial_state)
 
@@ -438,16 +436,6 @@ def _post_stock():
     set_stock_symbol(symbol)
     _note_active_mode('<stock')
 
-    # Picking a symbol is a deliberate act, so make sure it is actually visible.
-    # The firmware leaves the pause flag alone on incoming frames (see
-    # processStock) precisely so the poller cannot do this behind the user's
-    # back, which means an explicit resume belongs here.
-    try:
-        send("<stockpause,0>")
-        _note_active_mode('<stock')
-    except (serial.SerialException, OSError):
-        pass
-
     return jsonify({
         'response': 'ok',
         'symbol': result['symbol'],
@@ -455,12 +443,6 @@ def _post_stock():
         'currency': result.get('currency', 'USD'),
         'closes': result['closes'],
         })
-
-# Route to pause/play the stock chart.
-@app.route('/_pause_stock/', methods=['POST'])
-def _pause_stock():
-    data = request.get_json()
-    return request_and_respond("<stockpause," + str(data['pause']) + ">")
 
 # Endpoint for the web UI's preview, which renders the same layout as the wall.
 @app.route('/_stock_data/')

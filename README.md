@@ -30,7 +30,16 @@ misreads: `7448` looks like $7,448 rather than $74.48.
 It is a still image. The wall repaints only when the data actually changes, and
 the server does not even send a frame unless it would look different, so most
 refreshes touch nothing at all. Nothing fades, pulses or animates -- at this
-brightness any movement is distracting rather than informative.
+brightness any movement is distracting rather than informative. For the same
+reason there is no pause control: there is nothing to pause.
+
+Gains are teal and losses amber, not green and red. Saturated green and red on a
+bright panel reads as Christmas decoration, and it is also the worst pairing for
+red-green colourblindness. Every colour is defined as a named constant in the
+palette block above `stockChart()` in `lightwall.ino`, including a single
+`stockBrightness` that scales the whole mode -- tuning means editing a number
+there and reflashing. The `colors` map in `static/app.js` mirrors it for the
+preview and should be kept roughly in step.
 
 Prices come from Yahoo's chart endpoint, which needs no API key but does need a
 browser `User-Agent` header -- without one it answers 429. One call returns both

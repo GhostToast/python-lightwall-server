@@ -4,12 +4,6 @@
                 initialState = JSON.parse('{{initialState | tojson | safe}}');
             </script>
             <h1>Stock</h1>
-            <button type="button" class="btn bg-warning" id="pause-stock">
-                <i class="material-icons">pause</i>
-            </button>
-            <button type="button" class="btn bg-warning" id="play-stock">
-                <i class="material-icons">play_arrow</i>
-            </button>
 
             <form id="stock-form" class="form-inline my-3">
                 <input type="text" class="form-control mr-2" id="stock-symbol"
@@ -23,7 +17,8 @@
             <p id="stock-status"></p>
 
             <!-- Mirrors what the wall draws, struts and all, so the layout can be
-                 checked without standing in front of it. -->
-            <canvas id="stock-preview" width="330" height="330"></canvas>
+                 checked without standing in front of it. Dimensions are set in
+                 app.js from the cell metrics, so they always match the content. -->
+            <canvas id="stock-preview"></canvas>
 
 {% include '_footer.html' %}
