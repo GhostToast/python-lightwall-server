@@ -348,17 +348,38 @@ function addStockSymbolBinding() {
             },
             body: JSON.stringify({symbol: symbol})
         }).then(function(response) {
-            return response.json().then(function(body) {
-                return {ok: response.ok, body: body};
+            // A 500 returns an HTML error page, not JSON, so parsing it throws.
+            // Read the body as text first and report what actually came back --
+            // an earlier version chained straight into response.json() with no
+            // catch, so any server error vanished silently and the page just sat
+            // there looking like nothing had happened.
+            return response.text().then(function(text) {
+                var body = null;
+                try {
+                    body = JSON.parse(text);
+                } catch (e) {
+                    body = null;
+                }
+                return {ok: response.ok, status: response.status, body: body, text: text};
             });
         }).then(function(result) {
+            if (!result.body) {
+                console.error('Non-JSON response from /_post_stock/:', result.text);
+                stockStatus.textContent = 'Server error ' + result.status +
+                    ' - check the server console for the traceback.';
+                return;
+            }
             if (!result.ok) {
-                stockStatus.textContent = result.body.error || 'Could not load that symbol.';
+                stockStatus.textContent = result.body.error ||
+                    ('Could not load that symbol (' + result.status + ').');
                 return;
             }
             stockStatus.textContent = result.body.symbol + ' ' +
                 result.body.price + ' ' + result.body.currency;
             loadStockPreview();
+        }).catch(function(error) {
+            console.error('Request to /_post_stock/ failed:', error);
+            stockStatus.textContent = 'Request failed: ' + error.message;
         });
     });
 }
@@ -373,6 +394,10 @@ function loadStockPreview() {
         if (snapshot.data && snapshot.data.cells) {
             drawStockPreview(snapshot.data.cells, snapshot.data.stale);
         }
+    }).catch(function(error) {
+        // Never fail silently here either -- without this a broken preview looks
+        // identical to a preview that simply has no data yet.
+        console.error('Request to /_stock_data/ failed:', error);
     });
 }
 
@@ -385,16 +410,21 @@ function loadStockPreview() {
  * physical wall, struts included.
  */
 function drawStockPreview(cells, stale) {
-    // Approximates the firmware palette in lightwall.ino -- teal gains, amber
+    // Mirrors the firmware palette in lightwall.ino -- emerald gains, crimson
     // losses, neutral white for the baseline and text. Keep these in step with
     // the stock* colour constants there, or the preview stops being a useful
     // proxy for the wall.
+    //
+    // Deliberately lighter than the literal RGBW the panels emit. Those values
+    // are very dark (the gain line is (2, 55, 21)) because an LED at close range
+    // is far brighter than the same numbers on a monitor. These match how the
+    // wall looks, not what it is sent.
     var colors = {
         ' ': '#080808',
-        'g': '#0a2b28', // gain fill  - teal, dim
-        'G': '#3fbfb0', // gain line  - teal
-        'r': '#2e2109', // loss fill  - amber, dim
-        'R': '#d69433', // loss line  - amber
+        'g': '#0d2a18', // gain fill  - deep emerald
+        'G': '#2fa862', // gain line  - emerald
+        'r': '#2c0b10', // loss fill  - deep crimson
+        'R': '#c83a48', // loss line  - crimson
         '-': '#3a3a3a', // baseline   - neutral white channel
         '@': '#cfcfcf'  // text       - neutral white channel
     };

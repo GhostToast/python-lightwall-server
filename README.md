@@ -33,13 +33,22 @@ refreshes touch nothing at all. Nothing fades, pulses or animates -- at this
 brightness any movement is distracting rather than informative. For the same
 reason there is no pause control: there is nothing to pause.
 
-Gains are teal and losses amber, not green and red. Saturated green and red on a
-bright panel reads as Christmas decoration, and it is also the worst pairing for
-red-green colourblindness. Every colour is defined as a named constant in the
-palette block above `stockChart()` in `lightwall.ino`, including a single
-`stockBrightness` that scales the whole mode -- tuning means editing a number
-there and reflashing. The `colors` map in `static/app.js` mirrors it for the
-preview and should be kept roughly in step.
+Gains are green and losses red, kept deliberately dark: emerald and crimson
+rather than primaries. At this pixel density up-is-green is worth keeping, since
+it reads instantly where any other pairing has to be learned.
+
+Saturation stays high and lightness low, not the reverse. Desaturating a dark
+colour just makes it grey -- an amber tried at lightness 7 came out `(27, 19, 8)`
+and read as cream. Hue survives darkness; saturation does not. What made the
+first version look like Christmas decoration was lightness, not hue: at
+saturation 100 and lightness 38 the green was `(0, 193, 0)`, near full output.
+
+Every colour is a named constant in the palette block above `stockChart()` in
+`lightwall.ino`, including a single `stockBrightness` that scales the whole mode
+-- tuning means editing a number there and reflashing. The `colors` map in
+`static/app.js` mirrors it for the preview, deliberately lighter than the literal
+values because an LED at close range is far brighter than the same numbers on a
+monitor.
 
 Prices come from Yahoo's chart endpoint, which needs no API key but does need a
 browser `User-Agent` header -- without one it answers 429. One call returns both
