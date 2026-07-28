@@ -33,15 +33,24 @@ refreshes touch nothing at all. Nothing fades, pulses or animates -- at this
 brightness any movement is distracting rather than informative. For the same
 reason there is no pause control: there is nothing to pause.
 
-Gains are green and losses red, kept deliberately dark: emerald and crimson
-rather than primaries. At this pixel density up-is-green is worth keeping, since
-it reads instantly where any other pairing has to be learned.
+Gains are green and losses red, at exact hues 120 and 0 with saturation 100 and
+low lightness. At this pixel density up-is-green is worth keeping, since it reads
+instantly where any other pairing has to be learned.
 
-Saturation stays high and lightness low, not the reverse. Desaturating a dark
-colour just makes it grey -- an amber tried at lightness 7 came out `(27, 19, 8)`
-and read as cream. Hue survives darkness; saturation does not. What made the
-first version look like Christmas decoration was lightness, not hue: at
-saturation 100 and lightness 38 the green was `(0, 193, 0)`, near full output.
+Lightness is the only knob for subduing this. Two things that seem like they
+should work, and do not:
+
+- **Nudging the hues off the primaries.** "Emerald" 142 and "crimson" 355 put
+  blue at 39% and 13% of the dominant channel, and the panels showed aquamarine
+  and magenta. Blue bleed matters far more than the numbers suggest because the
+  fill covers most of the display. Saturation 100 at exactly 120 and 0 is what
+  holds the off-channels at zero.
+- **Desaturating.** A dark colour desaturated is just grey -- an amber at
+  saturation 55, lightness 7 came out `(27, 19, 8)` and read as cream. Hue
+  survives darkness; saturation does not.
+
+What made the first version look like Christmas decoration was lightness alone:
+at lightness 38 the green was `(0, 193, 0)`, near full output. It is 18 now.
 
 Every colour is a named constant in the palette block above `stockChart()` in
 `lightwall.ino`, including a single `stockBrightness` that scales the whole mode

@@ -410,21 +410,24 @@ function loadStockPreview() {
  * physical wall, struts included.
  */
 function drawStockPreview(cells, stale) {
-    // Mirrors the firmware palette in lightwall.ino -- emerald gains, crimson
-    // losses, neutral white for the baseline and text. Keep these in step with
-    // the stock* colour constants there, or the preview stops being a useful
-    // proxy for the wall.
+    // Mirrors the firmware palette in lightwall.ino: pure red and green with the
+    // off-channels at zero, plus neutral white for the baseline and text.
     //
-    // Deliberately lighter than the literal RGBW the panels emit. Those values
-    // are very dark (the gain line is (2, 55, 21)) because an LED at close range
-    // is far brighter than the same numbers on a monitor. These match how the
-    // wall looks, not what it is sent.
+    // Only the red and green channels are ever set here, exactly as on the wall.
+    // An earlier version hand-picked these hex values instead of deriving them
+    // from the firmware's hues, which hid a real bug -- the panels were showing
+    // aquamarine and magenta from blue bleed while this preview looked correct.
+    // If a colour here needs a blue component, the firmware is wrong, not this.
+    //
+    // The levels are raised relative to what the panels are sent, because an LED
+    // at close range is far brighter than the same numbers on a monitor. Ratios
+    // are preserved: the line is roughly three times the fill, as on the wall.
     var colors = {
         ' ': '#080808',
-        'g': '#0d2a18', // gain fill  - deep emerald
-        'G': '#2fa862', // gain line  - emerald
-        'r': '#2c0b10', // loss fill  - deep crimson
-        'R': '#c83a48', // loss line  - crimson
+        'g': '#003c00', // gain fill  - pure green, dim
+        'G': '#00b400', // gain line  - pure green
+        'r': '#3c0000', // loss fill  - pure red, dim
+        'R': '#d20000', // loss line  - pure red
         '-': '#3a3a3a', // baseline   - neutral white channel
         '@': '#cfcfcf'  // text       - neutral white channel
     };
