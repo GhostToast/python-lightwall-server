@@ -126,6 +126,32 @@ body {
     border-radius: .2rem;
 }
 
+#sprites-preview {
+    background: #000;
+    border: 1px solid #404040;
+    border-radius: .25rem;
+    margin-top: 12px;
+    cursor: pointer;
+}
+
+#sprites-legend {
+    margin-top: 24px;
+    max-width: 34rem;
+}
+
+#sprites-legend h2 {
+    font-size: 1rem;
+    color: #a0a0a0;
+    border-bottom: 1px solid #404040;
+    padding-bottom: 6px;
+}
+
+#sprites-list {
+    columns: 3;
+    font-size: .875rem;
+    padding-left: 1.5rem;
+}
+
 /* Background colour is set by app.js from the same palette the chart uses. */
 .legend-swatch {
     display: inline-block;

@@ -92,6 +92,45 @@ To iterate on the layout without the hardware:
     python3 stock.py NYT
     python3 stock.py TSLA PFE GOOGL
 
+## Sprite mode
+
+`/sprites` puts one 8x8 sprite in each of the wall's sixteen panels. This is the
+one mode that works *with* the physical construction rather than around it: every
+other mode treats the wooden struts between panels as damage to route around,
+whereas here a sprite fits exactly inside one panel and the strut frames it.
+
+Click a panel in the preview to cycle its sprite (shift-click to go back), then
+send. Shuffle and reset buttons are there for quickly judging combinations. The
+preview draws from the palette and bitmaps the server sends down from
+`sprites.py`, which are the same bytes compiled into the firmware, so it cannot
+drift from the wall.
+
+Only the sixteen *choices* travel over the wire (`<sprites,ABCDEFGHIJKLMNOP,155>`,
+28 characters). Pixels never do -- sixteen sprites of sixty-four pixels is 1024
+values, far past what one serial frame can carry -- so the bitmaps live in
+`lightwall/lightwall/sprites.h` and the server just says which goes where.
+
+### Regenerating the sprites
+
+    python3 tools/extract_sprites.py path/to/sheet.png
+
+That writes both `../lightwall/lightwall/sprites.h` and `sprites.py` from one
+source, so the two cannot disagree. Edit `CHOSEN` in the tool to pick different
+sprites from the sheet.
+
+Two things the tool has to work around. The sheet is a resampled upscale rather
+than a clean pixel-doubling, so every logical pixel comes out a slightly
+different shade -- the heart arrived with 25 colours for its 25 pixels. Colours
+within a Manhattan distance of 78 are therefore merged onto one shared palette,
+which drops each sprite to 2-9 colours and happens to suit the wall, since
+frosted plexiglass loses subtle shading anyway. And cell boundaries are found by
+thresholding ink profiles, tuned to yield exactly the sheet's 15x8 grid; the tool
+fails loudly rather than guessing if a different sheet does not match.
+
+Sprites were picked for clear silhouettes with useful negative space. Nearly
+solid ones were rejected deliberately: the floppy disk fills 62 of its 64 pixels
+and would read as a bright square through diffusion, not as an object.
+
 ## Roadmap
 - Water effect
 - Text mode

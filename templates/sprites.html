@@ -1,0 +1,37 @@
+{% include '_header.html' %}
+
+            <script>
+                initialState = JSON.parse('{{initialState | tojson | safe}}');
+            </script>
+            <h1>Sprites</h1>
+
+            <p id="sprites-status">
+                One 8x8 sprite per panel. Click a panel in the preview to cycle
+                which sprite sits there, then send it to the wall.
+            </p>
+
+            <!-- Draws from the same palette and bitmaps the firmware uses, sent
+                 down in initialState, so this cannot drift from the wall. -->
+            <canvas id="sprites-preview"></canvas>
+
+            <div class="my-3">
+                <button type="button" class="btn btn-light" id="sprites-send">
+                    <i class="material-icons">send</i>
+                </button>
+                <button type="button" class="btn btn-light" id="sprites-shuffle">
+                    <i class="material-icons">shuffle</i>
+                </button>
+                <button type="button" class="btn btn-light" id="sprites-reset">
+                    <i class="material-icons">restart_alt</i>
+                </button>
+            </div>
+
+            <label for="sprites-brightness-slider">Brightness</label>
+            <div class="sliders" id="sprites-brightness-slider"></div>
+
+            <section id="sprites-legend">
+                <h2>Available sprites</h2>
+                <ol id="sprites-list"></ol>
+            </section>
+
+{% include '_footer.html' %}

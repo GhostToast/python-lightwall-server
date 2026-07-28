@@ -88,6 +88,26 @@ if (window.location.pathname.indexOf('stock') == 1) {
     setInterval(loadStockPreview, 60000);
 }
 
+if (window.location.pathname.indexOf('sprites') == 1) {
+    mode = 'sprites';
+
+    var spritesPreview = document.getElementById('sprites-preview');
+    var spritesStatus = document.getElementById('sprites-status');
+    var spritesSend = document.getElementById('sprites-send');
+    var spritesShuffle = document.getElementById('sprites-shuffle');
+    var spritesReset = document.getElementById('sprites-reset');
+    var spritesList = document.getElementById('sprites-list');
+    var spritesBrightnessSlider = document.getElementById('sprites-brightness-slider');
+
+    var spriteLayout = initialState.layout.slice();
+    var spriteBrightness = initialState.brightness || 155;
+
+    listSprites();
+    spriteBrightnessControl();
+    addSpriteBindings();
+    drawSpritePreview();
+}
+
 // Initialize HSL Color picker if on proper page.
 if (window.location.pathname.indexOf('hsl-color') == 1) {
     mode = 'hsl';
@@ -357,6 +377,171 @@ function addPausePlayLifeButtonBinding() {
         ).then(
             html => console.log(html)
         );
+    });
+}
+
+// --- Sprites --------------------------------------------------------------
+
+var SPRITE_CELL = 9;   // Preview size of one LED.
+var SPRITE_GAP = 1;    // Space between LEDs, so they read as dots.
+var SPRITE_STRUT = 4;  // Drawn gap standing in for the wooden struts.
+
+/**
+ * Draw the 16 chosen sprites, one per panel.
+ *
+ * Uses the palette and bitmaps the server sent from sprites.py -- the same data
+ * compiled into the firmware -- rather than colours picked by eye here. The stock
+ * preview learned that lesson the hard way: hand-picked colours hid a real bug
+ * for days because the preview and the wall could disagree.
+ */
+function drawSpritePreview() {
+    var span = 8 * SPRITE_CELL + SPRITE_STRUT;   // one panel plus its strut
+    var extent = 4 * span - SPRITE_STRUT;
+    spritesPreview.width = extent;
+    spritesPreview.height = extent;
+
+    var context = spritesPreview.getContext('2d');
+    context.fillStyle = '#000';
+    context.fillRect(0, 0, extent, extent);
+    context.globalAlpha = Math.max(0.3, spriteBrightness / 255);
+
+    for (var panel = 0; panel < 16; panel++) {
+        var bitmap = initialState.sprites[spriteLayout[panel]];
+        var ox = (panel % 4) * span;
+        var oy = Math.floor(panel / 4) * span;
+
+        for (var y = 0; y < 8; y++) {
+            for (var x = 0; x < 8; x++) {
+                var index = bitmap[y * 8 + x];
+                if (!index) {
+                    continue;
+                }
+                context.fillStyle = initialState.palette[index - 1];
+                context.fillRect(ox + x * SPRITE_CELL, oy + y * SPRITE_CELL,
+                                 SPRITE_CELL - SPRITE_GAP, SPRITE_CELL - SPRITE_GAP);
+            }
+        }
+    }
+    context.globalAlpha = 1;
+}
+
+/** Which panel a click landed in, or -1. */
+function spritePanelAt(event) {
+    var rect = spritesPreview.getBoundingClientRect();
+    var span = 8 * SPRITE_CELL + SPRITE_STRUT;
+    var col = Math.floor((event.clientX - rect.left) / span);
+    var row = Math.floor((event.clientY - rect.top) / span);
+    if (col < 0 || col > 3 || row < 0 || row > 3) {
+        return -1;
+    }
+    return row * 4 + col;
+}
+
+function addSpriteBindings() {
+    // Click a panel to cycle its sprite; shift-click to go back.
+    spritesPreview.addEventListener('click', function (e) {
+        var panel = spritePanelAt(e);
+        if (panel < 0) {
+            return;
+        }
+        var count = initialState.sprites.length;
+        var step = e.shiftKey ? count - 1 : 1;
+        spriteLayout[panel] = (spriteLayout[panel] + step) % count;
+        drawSpritePreview();
+        spritesStatus.textContent = 'Panel ' + (panel + 1) + ': ' +
+            initialState.names[spriteLayout[panel]] + ' (not sent yet)';
+    });
+
+    spritesSend.addEventListener('click', function () {
+        sendSprites();
+    });
+
+    spritesShuffle.addEventListener('click', function () {
+        for (var i = 0; i < spriteLayout.length; i++) {
+            spriteLayout[i] = Math.floor(Math.random() * initialState.sprites.length);
+        }
+        drawSpritePreview();
+        sendSprites();
+    });
+
+    spritesReset.addEventListener('click', function () {
+        for (var i = 0; i < spriteLayout.length; i++) {
+            spriteLayout[i] = i % initialState.sprites.length;
+        }
+        drawSpritePreview();
+        sendSprites();
+    });
+}
+
+function sendSprites() {
+    fetch('/_post_sprites/', {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json'
+        },
+        body: JSON.stringify({layout: spriteLayout, brightness: spriteBrightness})
+    }).then(function (response) {
+        // Read as text first: a 500 returns an HTML page, and parsing that as
+        // JSON throws, which would otherwise fail silently.
+        return response.text().then(function (text) {
+            var body = null;
+            try {
+                body = JSON.parse(text);
+            } catch (e) {
+                body = null;
+            }
+            return {ok: response.ok, status: response.status, body: body, text: text};
+        });
+    }).then(function (result) {
+        if (!result.body) {
+            console.error('Non-JSON response from /_post_sprites/:', result.text);
+            spritesStatus.textContent = 'Server error ' + result.status +
+                ' - check the server console for the traceback.';
+            return;
+        }
+        if (!result.ok) {
+            spritesStatus.textContent = result.body.error || 'Could not send sprites.';
+            return;
+        }
+        spritesStatus.textContent = 'Sent. Wall is showing these 16 sprites.';
+    }).catch(function (error) {
+        console.error('Request to /_post_sprites/ failed:', error);
+        spritesStatus.textContent = 'Request failed: ' + error.message;
+    });
+}
+
+function listSprites() {
+    initialState.names.forEach(function (name, i) {
+        var item = document.createElement('li');
+        item.textContent = name;
+        spritesList.appendChild(item);
+    });
+}
+
+function spriteBrightnessControl() {
+    noUiSlider.create(spritesBrightnessSlider, {
+        start: spriteBrightness,
+        step: 1,
+        connect: 'lower',
+        tooltips: true,
+        range: {
+            'min': [initialState.minBrightness || 5],
+            'max': [initialState.maxBrightness || 255]
+        },
+        format: {
+            to: function (value) { return parseInt(value); },
+            from: function (value) { return parseInt(value); }
+        }
+    });
+
+    // Preview follows the drag; the wall only hears about it on release, since
+    // each change is a serial write and a full repaint.
+    spritesBrightnessSlider.noUiSlider.on('update', function () {
+        spriteBrightness = parseInt(spritesBrightnessSlider.noUiSlider.get());
+        drawSpritePreview();
+    });
+    spritesBrightnessSlider.noUiSlider.on('change', function () {
+        sendSprites();
     });
 }
 

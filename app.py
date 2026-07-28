@@ -4,7 +4,7 @@ from tinydb import TinyDB, Query
 from decouple import config
 import serial, json, threading
 
-import stock
+import sprites, stock
 
 # USB device, a Teensy 3.6 to send serial comms to.
 TEENSY = '/dev/serial/by-id/usb-Teensyduino_USB_Serial_5220260-if00'
@@ -94,6 +94,54 @@ def _note_active_mode(request_string):
 
 def stock_is_active():
     return _active_command == 'stock'
+
+
+# --- Sprites --------------------------------------------------------------
+
+# Sixteen 8x8 sprites, one per physical panel. Every other mode treats the struts
+# between panels as damage to route around; here each panel holds exactly one
+# sprite and the strut frames it.
+SPRITE_PANELS = 16
+
+def get_sprite_layout():
+    record = db.get(Query().type == 'sprites')
+    if record and len(record.get('layout', [])) == SPRITE_PANELS:
+        return [_clamp_sprite(i) for i in record['layout']]
+    # Default: one of each, in sheet order.
+    return [i % len(sprites.SPRITE_NAMES) for i in range(SPRITE_PANELS)]
+
+def get_sprite_brightness():
+    record = db.get(Query().type == 'sprites')
+    if record and 'brightness' in record:
+        return stock.normalize_brightness(record['brightness'])
+    return stock.DEFAULT_BRIGHTNESS
+
+def _clamp_sprite(index):
+    try:
+        index = int(index)
+    except (TypeError, ValueError):
+        return 0
+    return index if 0 <= index < len(sprites.SPRITE_NAMES) else 0
+
+def _update_sprite_record(fields):
+    query = Query()
+    if db.get(query.type == 'sprites'):
+        db.update(fields, query.type == 'sprites')
+    else:
+        record = {'type': 'sprites', 'layout': get_sprite_layout(),
+                  'brightness': stock.DEFAULT_BRIGHTNESS}
+        record.update(fields)
+        db.insert(record)
+
+def sprite_frame(layout, brightness):
+    """
+    <sprites,IIIIIIIIIIIIIIII,NNN> -- 16 choices as 'A'+index, then brightness.
+
+    Choices only, never pixels: 16 sprites of 64 pixels each would be 1024
+    values, far beyond one serial frame. The bitmaps live in the firmware.
+    """
+    choices = ''.join(chr(ord('A') + _clamp_sprite(i)) for i in layout)
+    return '<sprites,%s,%d>' % (choices, stock.normalize_brightness(brightness))
 
 def load_template_with_swatches(template, swatch_type, initial_state):
     # Supply swatches to front end.
@@ -491,6 +539,51 @@ def _stock_data():
     snapshot = poller.snapshot()
     snapshot['symbol'] = get_stock_symbol()
     return jsonify(snapshot)
+
+
+# Route for the sprite demo.
+@app.route('/sprites')
+def sprites_page():
+    initial_state = {
+        'type': 'sprites',
+        'layout': get_sprite_layout(),
+        'brightness': get_sprite_brightness(),
+        'minBrightness': stock.MIN_BRIGHTNESS,
+        'maxBrightness': stock.MAX_BRIGHTNESS,
+        'names': sprites.SPRITE_NAMES,
+        # The palette and bitmaps go to the browser so the preview draws from the
+        # same data the firmware does, rather than a hand-made approximation.
+        'palette': ['#%02x%02x%02x' % c for c in sprites.SPRITE_PALETTE],
+        'sprites': sprites.SPRITE_DATA,
+        }
+
+    return render_template('sprites.html', initialState=initial_state)
+
+# Endpoint for placing sprites and setting their brightness.
+@app.route('/_post_sprites/', methods=['POST'])
+def _post_sprites():
+    data = request.get_json()
+
+    layout = data.get('layout')
+    if layout is None:
+        layout = get_sprite_layout()
+    if len(layout) != SPRITE_PANELS:
+        return jsonify({'error': 'Expected %d sprite choices.' % SPRITE_PANELS}), 400
+    layout = [_clamp_sprite(i) for i in layout]
+
+    brightness = stock.normalize_brightness(
+        data.get('brightness', get_sprite_brightness()))
+
+    _update_sprite_record({'layout': layout, 'brightness': brightness})
+
+    try:
+        response = send(sprite_frame(layout, brightness))
+    except (serial.SerialException, OSError) as error:
+        return jsonify({'error': str(error)}), 503
+    _note_active_mode('<sprites')
+
+    return jsonify({'response': response.decode('utf-8', 'replace'),
+                    'layout': layout, 'brightness': brightness})
 
 
 # Run locally, accessible via any device on network.
