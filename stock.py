@@ -71,6 +71,15 @@ ROW_BASE = ord('A')
 
 PAD = '_'             # Blank glyph. A literal space would be fragile over serial.
 
+# Overall brightness, sent with every frame rather than compiled in, because the
+# right value depends on what the wall is doing at the time: comfortable to look
+# at in person is far too bright for a webcam, which has perhaps half the dynamic
+# range of an eye. Being able to drop it for a call and put it back afterwards is
+# not worth a reflash each way.
+DEFAULT_BRIGHTNESS = 155
+MIN_BRIGHTNESS = 5    # Not 0 -- a wall that goes black reads as a fault.
+MAX_BRIGHTNESS = 255
+
 
 # --- Font ------------------------------------------------------------------
 #
@@ -116,6 +125,11 @@ FONT_5X7 = {
     'Z': [0x1F, 0x01, 0x02, 0x04, 0x08, 0x10, 0x1F],
     '-': [0x00, 0x00, 0x00, 0x1F, 0x00, 0x00, 0x00],
     '+': [0x00, 0x04, 0x04, 0x1F, 0x04, 0x04, 0x00],
+    # Only 3 columns wide, unlike every other glyph here. A dollar sign is a
+    # vertical stroke through an S, so extra width buys it nothing -- a 5-wide
+    # version spends the space on S-bowls that just read as noise at this size.
+    # Sits on rows 1-6 so its foot lines up with the digit baseline.
+    '$': [0x00, 0x04, 0x0E, 0x0C, 0x06, 0x0E, 0x04],
     PAD: [0x00] * GLYPH_H,
 }
 
@@ -275,23 +289,34 @@ def format_price(price):
     """
     Fit a price into 4 glyphs, as whole dollars.
 
+    A dollar sign is included when the price is short enough to leave a panel
+    free for it, which covers anything under $1000 -- almost everything in
+    practice. Above that the digits need all four panels and the sign is dropped
+    rather than sacrificing a digit.
+
     No cents, deliberately. There is nowhere to put a decimal point -- a 1px dot
     would fall in the margin between panels, where a wooden strut hides it -- and
     an implied decimal does not read as one. '7448' looks like $7,448, not
     $74.48. Whole dollars are unambiguous at a glance, which is the whole point
     of a display you read from across the room.
 
-        74.48   -> '__74'
-       336.21   -> '_336'
-      1234.50   -> '1234'
+        74.48   -> '_$74'
+       336.21   -> '$336'
+      1234.50   -> '1234'   no room for the sign
      12345.00   -> '_12K'   thousands, once 4 digits will not fit
     """
     if price is None:
         return PAD * TEXT_SLOTS
-    if price < 10000:
-        text = str(int(round(price)))
+    # Decide on the rounded value, not the raw price. Testing price < 1000 lets
+    # $999.60 through, which rounds to 1000, and the four-slot truncation below
+    # then silently eats the dollar sign rather than a digit.
+    dollars = int(round(price))
+    if dollars < 1000:
+        text = '$' + str(dollars)
+    elif dollars < 10000:
+        text = str(dollars)
     else:
-        text = str(int(round(price / 1000))) + 'K'
+        text = str(int(round(dollars / 1000.0))) + 'K'
     return text[-TEXT_SLOTS:].rjust(TEXT_SLOTS, PAD)
 
 
@@ -305,21 +330,35 @@ def format_ticker(symbol):
     return text.ljust(TEXT_SLOTS, PAD)
 
 
-def build_frame(symbol, closes, price, stale=False):
+def normalize_brightness(value):
+    """Clamp to the range the firmware will accept, tolerating junk input."""
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return DEFAULT_BRIGHTNESS
+    return max(MIN_BRIGHTNESS, min(MAX_BRIGHTNESS, value))
+
+
+def build_frame(symbol, closes, price, stale=False, brightness=DEFAULT_BRIGHTNESS):
     """
     Produce the serial frame for one update.
 
-        <stock,SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS,B,TTTT,PPPP,F>
+        <stock,SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS,B,TTTT,PPPP,F,NNN>
 
     S  32 chart rows, one character per trading day
     B  baseline row (the oldest close in the window)
     T  ticker, 4 glyphs
     P  price, 4 glyphs
     F  flag bitfield; bit0 set means the data is stale
+    N  overall brightness, 5-255 as decimal
 
-    52 characters of payload, which is why the firmware's buffSize had to rise
-    from 40. Single-character encoding keeps this to one atomic frame instead of
-    a chunked protocol with ordering state.
+    56 characters of payload, which is why the firmware's buffSize had to rise
+    from 40. Single-character encoding for the series keeps this to one atomic
+    frame instead of a chunked protocol with ordering state; brightness is plain
+    decimal to match every other command in the protocol.
+
+    Brightness is last so that a firmware predating it still parses the rest --
+    it treats a missing trailing field as "keep the current value".
     """
     closes = list(closes)[-WINDOW:]
     if len(closes) < 2:
@@ -335,8 +374,9 @@ def build_frame(symbol, closes, price, stale=False):
     baseline = chr(ROW_BASE + rows[0])
     flags = 1 if stale else 0
 
-    return '<stock,%s,%s,%s,%s,%d>' % (
-        series, baseline, format_ticker(symbol), format_price(price), flags)
+    return '<stock,%s,%s,%s,%s,%d,%d>' % (
+        series, baseline, format_ticker(symbol), format_price(price), flags,
+        normalize_brightness(brightness))
 
 
 def decode_frame(frame):
@@ -345,10 +385,10 @@ def decode_frame(frame):
     if not (body.startswith('<') and body.endswith('>')):
         raise ValueError('frame is not delimited by <>')
     parts = body[1:-1].split(',')
-    if len(parts) != 6 or parts[0] != 'stock':
+    if len(parts) not in (6, 7) or parts[0] != 'stock':
         raise ValueError('unexpected frame shape: %r' % (parts,))
 
-    _, series, baseline, ticker, price, flags = parts
+    series, baseline, ticker, price, flags = parts[1:6]
     if len(series) != WINDOW:
         raise ValueError('expected %d series chars, got %d' % (WINDOW, len(series)))
 
@@ -358,6 +398,7 @@ def decode_frame(frame):
         'ticker': ticker,
         'price': price,
         'stale': bool(int(flags) & 1),
+        'brightness': int(parts[6]) if len(parts) == 7 else DEFAULT_BRIGHTNESS,
     }
 
 
@@ -543,11 +584,12 @@ class Poller(threading.Thread):
     whatever mode the user had selected.
     """
 
-    def __init__(self, send, get_symbol, is_active):
+    def __init__(self, send, get_symbol, is_active, get_brightness=None):
         super().__init__(daemon=True, name='stock-poller')
         self._send = send
         self._get_symbol = get_symbol
         self._is_active = is_active
+        self._get_brightness = get_brightness or (lambda: DEFAULT_BRIGHTNESS)
         self._wake = threading.Event()
         self._stop = threading.Event()
         self._lock = threading.Lock()
@@ -574,15 +616,17 @@ class Poller(threading.Thread):
         with self._lock:
             cache = dict(self._cache) if self._cache else None
             error = self._error
+        brightness = normalize_brightness(self._get_brightness())
         if cache:
             cache['stale'] = self._is_stale(cache)
+            cache['brightness'] = brightness
             try:
                 cache['cells'] = render_cells(build_frame(
                     cache['symbol'], cache['closes'], cache['price'],
-                    stale=cache['stale']))
+                    stale=cache['stale'], brightness=brightness))
             except (StockError, ValueError):
                 cache['cells'] = None
-        return {'data': cache, 'error': error}
+        return {'data': cache, 'error': error, 'brightness': brightness}
 
     def push(self, symbol=None, force=False):
         """
@@ -610,11 +654,29 @@ class Poller(threading.Thread):
         # never do -- and the chart rounds to 32 rows, so most refreshes encode
         # to a byte-identical frame. Skipping those keeps the panels untouched.
         if force or self._is_active():
-            frame = build_frame(data['symbol'], data['closes'], data['price'])
+            frame = build_frame(data['symbol'], data['closes'], data['price'],
+                                brightness=self._get_brightness())
             if force or frame != self._last_frame:
                 self._send(frame)
                 self._last_frame = frame
         return data
+
+    def repaint(self):
+        """
+        Redraw from cache without refetching. Used when only a display setting
+        changed -- brightness, say -- where going back to the network would be
+        pointless and would burn a request against the provider.
+        """
+        with self._lock:
+            cache = dict(self._cache) if self._cache else None
+        if not cache:
+            raise StockError('nothing to redraw yet')
+
+        frame = build_frame(cache['symbol'], cache['closes'], cache['price'],
+                            stale=self._is_stale(cache),
+                            brightness=self._get_brightness())
+        self._send(frame)
+        self._last_frame = frame
 
     # -- thread body --
 
@@ -654,7 +716,8 @@ class Poller(threading.Thread):
             return
         try:
             frame = build_frame(cache['symbol'], cache['closes'],
-                                cache['price'], stale=self._is_stale(cache))
+                                cache['price'], stale=self._is_stale(cache),
+                                brightness=self._get_brightness())
             if frame != self._last_frame:
                 self._send(frame)
                 self._last_frame = frame

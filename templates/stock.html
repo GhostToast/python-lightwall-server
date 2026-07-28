@@ -16,6 +16,13 @@
 
             <p id="stock-status"></p>
 
+            <!-- Overall brightness. Lives here rather than in the firmware
+                 because what looks right in person is far too bright for a
+                 webcam, and switching between the two should not need a
+                 reflash. -->
+            <label for="stock-brightness-slider">Brightness</label>
+            <div class="sliders" id="stock-brightness-slider"></div>
+
             <!-- Mirrors what the wall draws, struts and all, so the layout can be
                  checked without standing in front of it. Dimensions are set in
                  app.js from the cell metrics, so they always match the content. -->

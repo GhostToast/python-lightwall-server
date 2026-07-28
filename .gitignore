@@ -2,4 +2,9 @@
 db.json
 .env
 ..env.swp
+
+# Bytecode caches. Python 3 uses __pycache__; Python 2 wrote <module>.pyc next to
+# the source, so a stale stock.pyc can linger from before the server was moved to
+# python3. Harmless -- python3 never reads those -- but not worth committing.
 __pycache__/
+*.pyc

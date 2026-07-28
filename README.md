@@ -53,11 +53,27 @@ What made the first version look like Christmas decoration was lightness alone:
 at lightness 38 the green was `(0, 193, 0)`, near full output. It is 18 now.
 
 Every colour is a named constant in the palette block above `stockChart()` in
-`lightwall.ino`, including a single `stockBrightness` that scales the whole mode
--- tuning means editing a number there and reflashing. The `colors` map in
-`static/app.js` mirrors it for the preview, deliberately lighter than the literal
-values because an LED at close range is far brighter than the same numbers on a
-monitor.
+`lightwall.ino` -- tuning the relative weights means editing a number there and
+reflashing. The `stockColors` map in `static/app.js` mirrors it for the preview,
+deliberately lighter than the literal values because an LED at close range is far
+brighter than the same numbers on a monitor.
+
+### Brightness
+
+Overall brightness is a slider on `/stock`, not a compile-time constant, because
+what looks right in person is far too bright for a webcam -- a camera has roughly
+half the dynamic range of an eye, so a wall that is pleasant to sit next to blows
+out on camera while auto-exposure drops your face into shadow. Dropping it for a
+call and restoring it afterwards should not need two reflashes.
+
+The value rides along in every frame (5-255) and persists to TinyDB. Moving the
+slider redraws from the cached prices rather than refetching, so it costs no API
+request. It fires on release rather than on drag, since each change is a serial
+write and a full repaint.
+
+Note that dimming the wall is only half of the camera problem: the other half is
+putting some light on your face, so the two are within a few stops of each other.
+No camera setting fixes a bright wall in a dark room.
 
 Prices come from Yahoo's chart endpoint, which needs no API key but does need a
 browser `User-Agent` header -- without one it answers 429. One call returns both

@@ -388,11 +388,25 @@ def get_stock_symbol():
     return record['symbol'] if record else ''
 
 def set_stock_symbol(symbol):
+    _update_stock_record({'symbol': symbol})
+
+def get_stock_brightness():
+    record = db.get(Query().type == 'stock')
+    if record and 'brightness' in record:
+        return stock.normalize_brightness(record['brightness'])
+    return stock.DEFAULT_BRIGHTNESS
+
+def set_stock_brightness(value):
+    _update_stock_record({'brightness': stock.normalize_brightness(value)})
+
+def _update_stock_record(fields):
     query = Query()
     if db.get(query.type == 'stock'):
-        db.update({'symbol': symbol}, query.type == 'stock')
+        db.update(fields, query.type == 'stock')
     else:
-        db.insert({'type': 'stock', 'symbol': symbol})
+        record = {'type': 'stock', 'symbol': '', 'brightness': stock.DEFAULT_BRIGHTNESS}
+        record.update(fields)
+        db.insert(record)
 
 # Refreshes the wall while it is on stock mode. Collaborators are passed in so
 # stock.py never has to import this module back.
@@ -400,6 +414,7 @@ poller = stock.Poller(
     send=send,
     get_symbol=get_stock_symbol,
     is_active=stock_is_active,
+    get_brightness=get_stock_brightness,
     )
 
 # Route for the stock chart.
@@ -411,9 +426,12 @@ def stock_page():
     initial_state = {
         'type': 'stock',
         'symbol': get_stock_symbol(),
-        # Reported rather than hardcoded in the template, so the legend stays
-        # correct if the window size ever changes.
+        # Reported rather than hardcoded in the template, so the legend and the
+        # slider stay correct if these ever change.
         'days': stock.WINDOW,
+        'brightness': get_stock_brightness(),
+        'minBrightness': stock.MIN_BRIGHTNESS,
+        'maxBrightness': stock.MAX_BRIGHTNESS,
         }
 
     return render_template('stock.html', initialState=initial_state)
@@ -446,6 +464,26 @@ def _post_stock():
         'currency': result.get('currency', 'USD'),
         'closes': result['closes'],
         })
+
+# Endpoint for the overall brightness of the stock chart.
+@app.route('/_post_stock_brightness/', methods=['POST'])
+def _post_stock_brightness():
+    data = request.get_json()
+    brightness = stock.normalize_brightness(data.get('brightness'))
+    set_stock_brightness(brightness)
+
+    # Redraw from cache rather than refetching: only a display setting changed,
+    # so going back to the provider would burn a request for identical prices.
+    try:
+        poller.repaint()
+    except stock.StockError:
+        # No data cached yet, so there is nothing to redraw. The value is saved
+        # and will apply to the first frame.
+        pass
+    except (serial.SerialException, OSError) as error:
+        return jsonify({'error': str(error)}), 503
+
+    return jsonify({'response': 'ok', 'brightness': brightness})
 
 # Endpoint for the web UI's preview, which renders the same layout as the wall.
 @app.route('/_stock_data/')

@@ -73,12 +73,15 @@ if (window.location.pathname.indexOf('stock') == 1) {
     var stockSymbol = document.getElementById('stock-symbol');
     var stockStatus = document.getElementById('stock-status');
     var stockPreview = document.getElementById('stock-preview');
+    var stockBrightnessSlider = document.getElementById('stock-brightness-slider');
+    var stockBrightness = initialState.brightness || 155;
 
     // There is no pause control here, unlike the animated modes -- this chart is
     // a still image, so there is nothing to pause.
     stockSymbol.value = initialState.symbol || '';
     fillStockLegend();
     addStockSymbolBinding();
+    stockBrightnessControl();
     loadStockPreview();
 
     // The poller refreshes during market hours, so keep the preview in step.
@@ -431,6 +434,75 @@ function addStockSymbolBinding() {
     });
 }
 
+/**
+ * Overall brightness for the stock chart.
+ *
+ * Fires on 'change' rather than 'update' so dragging the handle does not send a
+ * frame per pixel of travel -- each one is a serial write and a full repaint of
+ * the wall. The preview follows continuously, so it still feels live.
+ */
+function stockBrightnessControl() {
+    noUiSlider.create(stockBrightnessSlider, {
+        start: stockBrightness,
+        step: 1,
+        connect: 'lower',
+        tooltips: true,
+        range: {
+            'min': [initialState.minBrightness || 5],
+            'max': [initialState.maxBrightness || 255]
+        },
+        format: {
+            to: function (value) { return parseInt(value); },
+            from: function (value) { return parseInt(value); }
+        }
+    });
+
+    // Bind keyboard, matching the other sliders on the site.
+    var handle = stockBrightnessSlider.querySelector('.noUi-handle');
+    handle.addEventListener('keydown', function (e) {
+        var value = parseInt(stockBrightnessSlider.noUiSlider.get());
+        if (e.which === 37) {
+            stockBrightnessSlider.noUiSlider.set(value - 1);
+        }
+        if (e.which === 39) {
+            stockBrightnessSlider.noUiSlider.set(value + 1);
+        }
+    });
+
+    // Track the handle locally for instant preview feedback...
+    stockBrightnessSlider.noUiSlider.on('update', function () {
+        stockBrightness = parseInt(stockBrightnessSlider.noUiSlider.get());
+        if (lastStockCells) {
+            drawStockPreview(lastStockCells, lastStockStale);
+        }
+    });
+
+    // ...but only tell the wall once the handle is released.
+    stockBrightnessSlider.noUiSlider.on('change', function () {
+        fetch('/_post_stock_brightness/', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify({brightness: stockBrightness})
+        }).then(
+            response => response.json()
+        ).then(function (body) {
+            if (body.error) {
+                stockStatus.textContent = body.error;
+            }
+        }).catch(function (error) {
+            console.error('Request to /_post_stock_brightness/ failed:', error);
+            stockStatus.textContent = 'Brightness not applied: ' + error.message;
+        });
+    });
+}
+
+// Last grid received, kept so the brightness slider can redraw the preview
+// without another round trip to the server.
+var lastStockCells = null;
+var lastStockStale = false;
+
 function loadStockPreview() {
     fetch('/_stock_data/').then(
         response => response.json()
@@ -439,7 +511,9 @@ function loadStockPreview() {
             stockStatus.textContent = snapshot.error;
         }
         if (snapshot.data && snapshot.data.cells) {
-            drawStockPreview(snapshot.data.cells, snapshot.data.stale);
+            lastStockCells = snapshot.data.cells;
+            lastStockStale = snapshot.data.stale;
+            drawStockPreview(lastStockCells, lastStockStale);
         }
     }).catch(function(error) {
         // Never fail silently here either -- without this a broken preview looks
@@ -471,7 +545,12 @@ function drawStockPreview(cells, stale) {
 
     context.fillStyle = '#000';
     context.fillRect(0, 0, extent, extent);
-    context.globalAlpha = stale ? 0.45 : 1;
+
+    // Reflect the brightness setting, floored so the preview never goes so dark
+    // it looks broken -- at the low end you are dimming for a camera, not
+    // turning the wall off, and the preview should still show the shape.
+    var level = Math.max(0.3, stockBrightness / 255);
+    context.globalAlpha = stale ? level * 0.5 : level;
 
     for (var y = 0; y < cells.length; y++) {
         for (var x = 0; x < cells[y].length; x++) {
