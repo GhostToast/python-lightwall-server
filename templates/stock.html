@@ -21,4 +21,48 @@
                  app.js from the cell metrics, so they always match the content. -->
             <canvas id="stock-preview"></canvas>
 
+            <!-- Swatch colours and the day count are filled in by app.js from the
+                 same values the preview draws with, so the legend cannot drift
+                 out of step with the chart it describes. -->
+            <section id="stock-legend">
+                <h2>Reading the chart</h2>
+                <dl>
+                    <dt><span class="legend-swatch" data-token="@"></span> Top row</dt>
+                    <dd>The ticker symbol, up to four letters.</dd>
+
+                    <dt><span class="legend-swatch" data-token="@"></span> Bottom row</dt>
+                    <dd>Current price in whole dollars. No cents &mdash; there is
+                        nowhere to put a decimal point, so <code>74</code> means
+                        about $74.</dd>
+
+                    <dt><span class="legend-swatch" data-token="-"></span> White line</dt>
+                    <dd>The baseline: what the stock cost
+                        <span data-days>32</span> trading days ago. Everything
+                        else is measured against this.</dd>
+
+                    <dt><span class="legend-swatch" data-token="G"></span> Green</dt>
+                    <dd>Above the baseline &mdash; worth more than it was
+                        <span data-days>32</span> trading days ago.</dd>
+
+                    <dt><span class="legend-swatch" data-token="R"></span> Red</dt>
+                    <dd>Below the baseline &mdash; worth less than it was
+                        <span data-days>32</span> trading days ago.</dd>
+
+                    <dt><span class="legend-swatch" data-token="G"></span><span class="legend-swatch" data-token="g"></span> Bright and dim</dt>
+                    <dd>The bright line is the closing price for each day. The
+                        dimmer band behind it just fills the gap back to the
+                        baseline, to make the shape readable at a distance.</dd>
+
+                    <dt>Columns</dt>
+                    <dd>One per trading day, <span data-days>32</span> in all.
+                        Oldest on the left, today on the right. Weekends and
+                        market holidays are skipped, so this covers roughly six
+                        and a half calendar weeks.</dd>
+
+                    <dt>Everything dimmed</dt>
+                    <dd>The price could not be refreshed for over an hour. What
+                        you are seeing is the last good data, not current.</dd>
+                </dl>
+            </section>
+
 {% include '_footer.html' %}

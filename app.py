@@ -411,6 +411,9 @@ def stock_page():
     initial_state = {
         'type': 'stock',
         'symbol': get_stock_symbol(),
+        # Reported rather than hardcoded in the template, so the legend stays
+        # correct if the window size ever changes.
+        'days': stock.WINDOW,
         }
 
     return render_template('stock.html', initialState=initial_state)

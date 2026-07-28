@@ -1,6 +1,31 @@
 /* global swatches, initialState */
 
 var mode;
+
+// Mirrors the firmware palette in lightwall.ino: pure red and green with the
+// off-channels at zero, plus neutral white for the baseline and text.
+//
+// Only the red and green channels are ever set here, exactly as on the wall. An
+// earlier version hand-picked these values instead of deriving them from the
+// firmware's hues, which hid a real bug -- the panels were showing aquamarine and
+// magenta from blue bleed while the preview looked correct. If a colour here
+// needs a blue component, the firmware is wrong, not this.
+//
+// The levels are raised relative to what the panels are sent, because an LED at
+// close range is far brighter than the same numbers on a monitor. Ratios are
+// preserved: the line is roughly three times the fill, as on the wall.
+//
+// Shared by the canvas preview and the legend, so the legend cannot describe
+// colours the chart does not actually use.
+var stockColors = {
+    ' ': '#080808',
+    'g': '#003c00', // gain fill  - pure green, dim
+    'G': '#00b400', // gain line  - pure green
+    'r': '#3c0000', // loss fill  - pure red, dim
+    'R': '#d20000', // loss line  - pure red
+    '-': '#3a3a3a', // baseline   - neutral white channel
+    '@': '#cfcfcf'  // text       - neutral white channel
+};
 // Initialize RGBW Color picker if on proper page.
 if (window.location.pathname.indexOf('rgbw-color') == 1) {
     mode = 'rgbw';
@@ -52,6 +77,7 @@ if (window.location.pathname.indexOf('stock') == 1) {
     // There is no pause control here, unlike the animated modes -- this chart is
     // a still image, so there is nothing to pause.
     stockSymbol.value = initialState.symbol || '';
+    fillStockLegend();
     addStockSymbolBinding();
     loadStockPreview();
 
@@ -331,6 +357,27 @@ function addPausePlayLifeButtonBinding() {
     });
 }
 
+/**
+ * Colour the legend swatches and fill in the day count.
+ *
+ * Both come from the values the chart is actually drawn with -- stockColors and
+ * the window size reported by the server -- rather than being written into the
+ * template. A legend that can disagree with its chart is worse than no legend.
+ */
+function fillStockLegend() {
+    var swatchElements = document.getElementsByClassName('legend-swatch');
+    for (var i = 0; i < swatchElements.length; i++) {
+        var token = swatchElements[i].getAttribute('data-token');
+        swatchElements[i].style.background = stockColors[token] || stockColors[' '];
+    }
+
+    var days = initialState.days || 32;
+    var dayElements = document.querySelectorAll('[data-days]');
+    for (var j = 0; j < dayElements.length; j++) {
+        dayElements[j].textContent = days;
+    }
+}
+
 function addStockSymbolBinding() {
     stockForm.addEventListener('submit', function(e) {
         e.preventDefault();
@@ -410,28 +457,6 @@ function loadStockPreview() {
  * physical wall, struts included.
  */
 function drawStockPreview(cells, stale) {
-    // Mirrors the firmware palette in lightwall.ino: pure red and green with the
-    // off-channels at zero, plus neutral white for the baseline and text.
-    //
-    // Only the red and green channels are ever set here, exactly as on the wall.
-    // An earlier version hand-picked these hex values instead of deriving them
-    // from the firmware's hues, which hid a real bug -- the panels were showing
-    // aquamarine and magenta from blue bleed while this preview looked correct.
-    // If a colour here needs a blue component, the firmware is wrong, not this.
-    //
-    // The levels are raised relative to what the panels are sent, because an LED
-    // at close range is far brighter than the same numbers on a monitor. Ratios
-    // are preserved: the line is roughly three times the fill, as on the wall.
-    var colors = {
-        ' ': '#080808',
-        'g': '#003c00', // gain fill  - pure green, dim
-        'G': '#00b400', // gain line  - pure green
-        'r': '#3c0000', // loss fill  - pure red, dim
-        'R': '#d20000', // loss line  - pure red
-        '-': '#3a3a3a', // baseline   - neutral white channel
-        '@': '#cfcfcf'  // text       - neutral white channel
-    };
-
     var context = stockPreview.getContext('2d');
     var cell = 9;   // Pixel size in the preview.
     var strut = 3;  // Drawn gap between panels.
@@ -450,7 +475,7 @@ function drawStockPreview(cells, stale) {
 
     for (var y = 0; y < cells.length; y++) {
         for (var x = 0; x < cells[y].length; x++) {
-            context.fillStyle = colors[cells[y][x]] || colors[' '];
+            context.fillStyle = stockColors[cells[y][x]] || stockColors[' '];
             context.fillRect(
                 x * cell + Math.floor(x / 8) * strut,
                 y * cell + Math.floor(y / 8) * strut,

@@ -88,4 +88,52 @@ body {
     display: none;
 }
 
+#stock-preview {
+    background: #000;
+    border: 1px solid #404040;
+    border-radius: .25rem;
+    margin-top: 12px;
+}
+
+#stock-legend {
+    margin-top: 24px;
+    max-width: 34rem;
+}
+
+#stock-legend h2 {
+    font-size: 1rem;
+    color: #a0a0a0;
+    border-bottom: 1px solid #404040;
+    padding-bottom: 6px;
+}
+
+#stock-legend dt {
+    color: #b0b0b0;
+    font-weight: normal;
+    margin-top: 10px;
+}
+
+#stock-legend dd {
+    margin: 2px 0 0 0;
+    font-size: .875rem;
+    color: #808080;
+}
+
+#stock-legend code {
+    color: #b0b0b0;
+    background: #1c1c1c;
+    padding: 0 4px;
+    border-radius: .2rem;
+}
+
+/* Background colour is set by app.js from the same palette the chart uses. */
+.legend-swatch {
+    display: inline-block;
+    width: 11px;
+    height: 11px;
+    margin-right: 3px;
+    border: 1px solid #404040;
+    vertical-align: baseline;
+}
+
 
