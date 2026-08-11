@@ -9,6 +9,13 @@ body {
      margin: 15px;
 }
 
+/* Same layout as .sliders, kept separate so pages that iterate
+   getElementsByClassName('sliders') (the HSL color pickers) don't pick these
+   up as color channels -- see lifeTimingControl() in app.js. */
+.timing-sliders {
+     margin: 15px;
+}
+
 #preview-container {
     background: #FFF;
     border-radius: .25rem;

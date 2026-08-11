@@ -56,6 +56,14 @@ if (window.location.pathname.indexOf('life') == 1) {
     var pauseLifeButton = document.getElementById('pause-life');
     var playLifeButton = document.getElementById('play-life');
 
+    // Speed / Organic sliders. Not part of the 'sliders' class collection
+    // above -- that one is iterated by hslColorPicker() as hue/saturation/
+    // lightness, and these two are neither.
+    var lifeSpeedSlider = document.getElementById('life-speed-slider');
+    var lifeOrganicSlider = document.getElementById('life-organic-slider');
+    var lifeSpeed = initialState.speed || 370;
+    var lifeOrganic = (initialState.organic !== undefined) ? initialState.organic : 50;
+
     // Load for HSL Color Picker.
     setInitialHSLState();
     loadSwatches();
@@ -64,6 +72,7 @@ if (window.location.pathname.indexOf('life') == 1) {
     addSwatchSaveBinding();
     addBodyClickBinding();
     addPausePlayLifeButtonBinding();
+    lifeTimingControl();
 }
 
 if (window.location.pathname.indexOf('stock') == 1) {
@@ -378,6 +387,78 @@ function addPausePlayLifeButtonBinding() {
             html => console.log(html)
         );
     });
+}
+
+/**
+ * Life's Speed (ms/generation) and Organic (0-100, per-cell fade stagger)
+ * sliders. Built on the same split as spriteBrightnessControl(): the handle
+ * position is tracked on every 'update' tick for instant feedback, but the
+ * wall only hears about it on 'change' (handle release). Each send is a
+ * blocking serial write behind a process-wide mutex (see app.py's _serial_lock),
+ * so firing one per pixel of drag would stall the UI and flood the wire.
+ *
+ * Deliberately posts to /_post_life_timing/ rather than /_post_life_color/ --
+ * the color endpoint recolors every live cell on the wall, which would erase
+ * whatever genetic drift the colony has built up on every drag.
+ */
+function lifeTimingControl() {
+    noUiSlider.create(lifeSpeedSlider, {
+        start: lifeSpeed,
+        step: 1,
+        connect: 'lower',
+        tooltips: true,
+        range: {
+            'min': [initialState.minSpeed || 80],
+            'max': [initialState.maxSpeed || 1500]
+        },
+        format: {
+            to: function (value) { return parseInt(value); },
+            from: function (value) { return parseInt(value); }
+        }
+    });
+
+    noUiSlider.create(lifeOrganicSlider, {
+        start: lifeOrganic,
+        step: 1,
+        connect: 'lower',
+        tooltips: true,
+        range: {
+            'min': [0],
+            'max': [100]
+        },
+        format: {
+            to: function (value) { return parseInt(value); },
+            from: function (value) { return parseInt(value); }
+        }
+    });
+
+    lifeSpeedSlider.noUiSlider.on('update', function () {
+        lifeSpeed = parseInt(lifeSpeedSlider.noUiSlider.get());
+    });
+    lifeSpeedSlider.noUiSlider.on('change', function () {
+        sendLifeTiming();
+    });
+
+    lifeOrganicSlider.noUiSlider.on('update', function () {
+        lifeOrganic = parseInt(lifeOrganicSlider.noUiSlider.get());
+    });
+    lifeOrganicSlider.noUiSlider.on('change', function () {
+        sendLifeTiming();
+    });
+}
+
+function sendLifeTiming() {
+    fetch('/_post_life_timing/', {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json'
+        },
+        body: JSON.stringify({speed: lifeSpeed, organic: lifeOrganic})
+    }).then(
+        response => response.text()
+    ).then(
+        html => console.log(html)
+    );
 }
 
 // --- Sprites --------------------------------------------------------------

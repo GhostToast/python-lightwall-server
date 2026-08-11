@@ -161,6 +161,32 @@ def load_template_with_swatches(template, swatch_type, initial_state):
 def index():
     return render_template('index.html')
 
+# Life's generation speed and per-cell fade stagger. Kept here rather than in
+# stock.py -- normalize_brightness() there is the pattern to follow, but these
+# values are Life-specific and nothing else needs them.
+LIFE_DEFAULT_SPEED = 370
+LIFE_MIN_SPEED = 80
+LIFE_MAX_SPEED = 1500
+LIFE_DEFAULT_ORGANIC = 50
+LIFE_MIN_ORGANIC = 0
+LIFE_MAX_ORGANIC = 100
+
+def normalize_life_speed(value):
+    """Clamp to the range the firmware will accept, tolerating junk input."""
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return LIFE_DEFAULT_SPEED
+    return max(LIFE_MIN_SPEED, min(LIFE_MAX_SPEED, value))
+
+def normalize_life_organic(value):
+    """Clamp to the range the firmware will accept, tolerating junk input."""
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return LIFE_DEFAULT_ORGANIC
+    return max(LIFE_MIN_ORGANIC, min(LIFE_MAX_ORGANIC, value))
+
 # Route for Conway's Game of Life.
 @app.route('/life')
 def life():
@@ -168,16 +194,39 @@ def life():
         'type': 'life',
         'h': 0,
         's': 0,
-        'l': 0
+        'l': 0,
+        'speed': LIFE_DEFAULT_SPEED,
+        'organic': LIFE_DEFAULT_ORGANIC,
+        'minSpeed': LIFE_MIN_SPEED,
+        'maxSpeed': LIFE_MAX_SPEED,
         }
-    
+
     state = get_state()
     if (b'life' == state[0]):
+        # <life,h,s,l,speed,organic> -- speed/organic are absent from an older
+        # firmware, so default rather than index off the end.
         initial_state = {
             'type': 'life',
             'h': state[1],
             's': state[2],
-            'l': state[3]
+            'l': state[3],
+            'speed': normalize_life_speed(state[4]) if len(state) > 4 else LIFE_DEFAULT_SPEED,
+            'organic': normalize_life_organic(state[5]) if len(state) > 5 else LIFE_DEFAULT_ORGANIC,
+            'minSpeed': LIFE_MIN_SPEED,
+            'maxSpeed': LIFE_MAX_SPEED,
+            }
+    elif (b'lifepause' == state[0]):
+        # <lifepause,N,speed,organic> -- no color here, so h/s/l stay at the
+        # defaults above, but the sliders still need to restore while paused.
+        initial_state = {
+            'type': 'life',
+            'h': 0,
+            's': 0,
+            'l': 0,
+            'speed': normalize_life_speed(state[2]) if len(state) > 2 else LIFE_DEFAULT_SPEED,
+            'organic': normalize_life_organic(state[3]) if len(state) > 3 else LIFE_DEFAULT_ORGANIC,
+            'minSpeed': LIFE_MIN_SPEED,
+            'maxSpeed': LIFE_MAX_SPEED,
             }
 
     return load_template_with_swatches('life.html', 'hsl', initial_state)
@@ -197,6 +246,18 @@ def _post_life_color():
 def _life():
     data = request.get_json()
     return request_and_respond("<lifepause," + str(data['pause']) + ">")
+
+# Endpoint for Life's speed and organic (fade stagger) sliders. Deliberately a
+# separate command from <life,...>, which recolors the whole board and would
+# erase accumulated genetic drift on every drag -- see processLifeTiming() in
+# the firmware.
+@app.route('/_post_life_timing/', methods=['POST'])
+def _post_life_timing():
+    data = request.get_json()
+    speed = normalize_life_speed(data.get('speed'))
+    organic = normalize_life_organic(data.get('organic'))
+
+    return request_and_respond("<lifetiming,"+str(speed)+","+str(organic)+">")
 
 # Route for fire.
 @app.route('/fire')
