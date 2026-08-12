@@ -61,7 +61,9 @@ if (window.location.pathname.indexOf('life') == 1) {
     // lightness, and these two are neither.
     var lifeSpeedSlider = document.getElementById('life-speed-slider');
     var lifeOrganicSlider = document.getElementById('life-organic-slider');
-    var lifeSpeed = initialState.speed || 370;
+    var lifeSpeedMin = initialState.minSpeed || 80;
+    var lifeSpeedMax = initialState.maxSpeed || 1500;
+    var lifeSpeed = initialState.speed || 370; // Milliseconds/generation, as sent to the wall.
     var lifeOrganic = (initialState.organic !== undefined) ? initialState.organic : 50;
 
     // Load for HSL Color Picker.
@@ -390,26 +392,36 @@ function addPausePlayLifeButtonBinding() {
 }
 
 /**
- * Life's Speed (ms/generation) and Organic (0-100, per-cell fade stagger)
- * sliders. Built on the same split as spriteBrightnessControl(): the handle
- * position is tracked on every 'update' tick for instant feedback, but the
- * wall only hears about it on 'change' (handle release). Each send is a
- * blocking serial write behind a process-wide mutex (see app.py's _serial_lock),
- * so firing one per pixel of drag would stall the UI and flood the wire.
+ * Life's Speed (ms/generation, sent inverted -- see below) and Organic
+ * (0-100, per-cell fade stagger) sliders. Built on the same split as
+ * spriteBrightnessControl(): the handle position is tracked on every
+ * 'update' tick for instant feedback, but the wall only hears about it on
+ * 'change' (handle release). Each send is a blocking serial write behind a
+ * process-wide mutex (see app.py's _serial_lock), so firing one per pixel of
+ * drag would stall the UI and flood the wire.
  *
  * Deliberately posts to /_post_life_timing/ rather than /_post_life_color/ --
  * the color endpoint recolors every live cell on the wall, which would erase
  * whatever genetic drift the colony has built up on every drag.
+ *
+ * The wire value is milliseconds per generation, where a *smaller* number is
+ * faster -- that reads backwards on a slider labelled "Speed", where dragging
+ * right is expected to mean faster and show a bigger number. Rather than
+ * expose raw milliseconds, the slider's own handle position is the mirror
+ * image (lifeSpeedMin + lifeSpeedMax - ms): dragging right increases the
+ * handle value and decreases the milliseconds sent, so right is faster and
+ * the displayed number rises to match. The transform is its own inverse, so
+ * the same line converts in both directions.
  */
 function lifeTimingControl() {
     noUiSlider.create(lifeSpeedSlider, {
-        start: lifeSpeed,
+        start: lifeSpeedMin + lifeSpeedMax - lifeSpeed,
         step: 1,
         connect: 'lower',
         tooltips: true,
         range: {
-            'min': [initialState.minSpeed || 80],
-            'max': [initialState.maxSpeed || 1500]
+            'min': [lifeSpeedMin],
+            'max': [lifeSpeedMax]
         },
         format: {
             to: function (value) { return parseInt(value); },
@@ -433,7 +445,8 @@ function lifeTimingControl() {
     });
 
     lifeSpeedSlider.noUiSlider.on('update', function () {
-        lifeSpeed = parseInt(lifeSpeedSlider.noUiSlider.get());
+        var handleValue = parseInt(lifeSpeedSlider.noUiSlider.get());
+        lifeSpeed = lifeSpeedMin + lifeSpeedMax - handleValue;
     });
     lifeSpeedSlider.noUiSlider.on('change', function () {
         sendLifeTiming();
