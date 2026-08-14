@@ -1,0 +1,41 @@
+{% include '_header.html' %}
+
+            <script>
+                swatches = JSON.parse('{{swatches | tojson | safe}}');
+                initialState = JSON.parse('{{initialState | tojson | safe}}');
+            </script>
+            <h1>Fireflies</h1>
+            <button type="button" class="btn bg-warning" id="pause-fireflies">
+                <i class="material-icons">pause</i>
+            </button>
+            <button type="button" class="btn bg-warning" id="play-fireflies">
+                <i class="material-icons">play_arrow</i>
+            </button>
+            <h3>Customize</h3>
+            <div id="preview-container">
+                <div id="preview" class="text-right">
+                    <button type="button" class="btn btn-light" id="save-color">
+                        <i class="material-icons">save</i>
+                    </button>
+                </div>
+            </div>
+            <!-- Exactly one .sliders element, as on the Fire page: hslColorPicker()
+                 iterates that collection as hue/saturation/lightness by index, so a
+                 second one here would be read as a saturation channel. Everything
+                 below is .timing-sliders and is created by id. -->
+            <div class="sliders" id="hue-slider"></div>
+
+            <label for="fireflies-fade-slider">Fade</label>
+            <div class="timing-sliders" id="fireflies-fade-slider"></div>
+
+            <label for="fireflies-hold-slider">Glow</label>
+            <div class="timing-sliders" id="fireflies-hold-slider"></div>
+
+            <label for="fireflies-frequency-slider">Frequency</label>
+            <div class="timing-sliders" id="fireflies-frequency-slider"></div>
+
+            <label for="fireflies-variation-slider">Color Variation</label>
+            <div class="timing-sliders" id="fireflies-variation-slider"></div>
+
+            <div id="swatch-container"></div>
+{% include '_footer.html' %}

@@ -209,6 +209,65 @@ def normalize_life_ember(value):
         return LIFE_DEFAULT_EMBER
     return max(LIFE_MIN_EMBER, min(LIFE_MAX_EMBER, value))
 
+# Fireflies: glow shape (fade, hold), density (frequency), and hue spread.
+# Same shape as the Life constants above -- Fireflies-specific, so kept here
+# rather than in stock.py. Mirrors the firmware clamps in
+# processFirefliesTiming(); the firmware clamps again, this is so the UI and
+# the DB never carry a value the wall would silently reject.
+FIREFLIES_DEFAULT_HUE = 60
+FIREFLIES_DEFAULT_FADE = 700
+FIREFLIES_MIN_FADE = 100
+FIREFLIES_MAX_FADE = 2500
+FIREFLIES_DEFAULT_HOLD = 300
+FIREFLIES_MIN_HOLD = 0
+FIREFLIES_MAX_HOLD = 3000
+FIREFLIES_DEFAULT_FREQUENCY = 40
+FIREFLIES_MIN_FREQUENCY = 0
+FIREFLIES_MAX_FREQUENCY = 100
+FIREFLIES_DEFAULT_VARIATION = 40
+FIREFLIES_MIN_VARIATION = 0
+FIREFLIES_MAX_VARIATION = 100
+
+def normalize_fireflies_hue(value):
+    """Wrap to 0-359, tolerating junk input. get_state() hands us bytes, which
+    int() accepts."""
+    try:
+        return int(value) % 360
+    except (TypeError, ValueError):
+        return FIREFLIES_DEFAULT_HUE
+
+def normalize_fireflies_fade(value):
+    """Clamp to the range the firmware will accept, tolerating junk input."""
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return FIREFLIES_DEFAULT_FADE
+    return max(FIREFLIES_MIN_FADE, min(FIREFLIES_MAX_FADE, value))
+
+def normalize_fireflies_hold(value):
+    """Clamp to the range the firmware will accept, tolerating junk input."""
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return FIREFLIES_DEFAULT_HOLD
+    return max(FIREFLIES_MIN_HOLD, min(FIREFLIES_MAX_HOLD, value))
+
+def normalize_fireflies_frequency(value):
+    """Clamp to the range the firmware will accept, tolerating junk input."""
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return FIREFLIES_DEFAULT_FREQUENCY
+    return max(FIREFLIES_MIN_FREQUENCY, min(FIREFLIES_MAX_FREQUENCY, value))
+
+def normalize_fireflies_variation(value):
+    """Clamp to the range the firmware will accept, tolerating junk input."""
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return FIREFLIES_DEFAULT_VARIATION
+    return max(FIREFLIES_MIN_VARIATION, min(FIREFLIES_MAX_VARIATION, value))
+
 # Route for Conway's Game of Life.
 @app.route('/life')
 def life():
@@ -333,6 +392,80 @@ def _post_fire_special():
     special = data['special']
     
     return request_and_respond("<specialfire,"+str(special)+">")
+
+# Route for fireflies.
+@app.route('/fireflies')
+def fireflies():
+    initial_state = {
+        'type': 'fireflies',
+        'h': FIREFLIES_DEFAULT_HUE,
+        's': 100,
+        'l': 50,
+        'fade': FIREFLIES_DEFAULT_FADE,
+        'hold': FIREFLIES_DEFAULT_HOLD,
+        'frequency': FIREFLIES_DEFAULT_FREQUENCY,
+        'variation': FIREFLIES_DEFAULT_VARIATION,
+        'minFade': FIREFLIES_MIN_FADE,
+        'maxFade': FIREFLIES_MAX_FADE,
+        'minHold': FIREFLIES_MIN_HOLD,
+        'maxHold': FIREFLIES_MAX_HOLD,
+        }
+
+    state = get_state()
+    if (b'fireflies' == state[0]):
+        # <fireflies,hue,fade,hold,frequency,variation> -- newer fields are
+        # absent from an older firmware, so default rather than index off the
+        # end. s/l are not on the wire: like Fire, this mode is hue-only and
+        # the picker is fed a fixed s=100/l=50.
+        initial_state.update({
+            'h': normalize_fireflies_hue(state[1]) if len(state) > 1 else FIREFLIES_DEFAULT_HUE,
+            'fade': normalize_fireflies_fade(state[2]) if len(state) > 2 else FIREFLIES_DEFAULT_FADE,
+            'hold': normalize_fireflies_hold(state[3]) if len(state) > 3 else FIREFLIES_DEFAULT_HOLD,
+            'frequency': normalize_fireflies_frequency(state[4]) if len(state) > 4 else FIREFLIES_DEFAULT_FREQUENCY,
+            'variation': normalize_fireflies_variation(state[5]) if len(state) > 5 else FIREFLIES_DEFAULT_VARIATION,
+            })
+    elif (b'firefliespause' == state[0]):
+        # <firefliespause,N,fade,hold,frequency,variation> -- no hue here, so
+        # it stays at the default above, but the sliders still need to
+        # restore while paused. Same shape as the lifepause branch, which
+        # likewise doesn't surface the pause flag itself into initial_state --
+        # keeping parity rather than introducing an unprecedented field.
+        initial_state.update({
+            'fade': normalize_fireflies_fade(state[2]) if len(state) > 2 else FIREFLIES_DEFAULT_FADE,
+            'hold': normalize_fireflies_hold(state[3]) if len(state) > 3 else FIREFLIES_DEFAULT_HOLD,
+            'frequency': normalize_fireflies_frequency(state[4]) if len(state) > 4 else FIREFLIES_DEFAULT_FREQUENCY,
+            'variation': normalize_fireflies_variation(state[5]) if len(state) > 5 else FIREFLIES_DEFAULT_VARIATION,
+            })
+
+    return load_template_with_swatches('fireflies.html', 'hsl', initial_state)
+
+# Route to pause/play fireflies.
+@app.route('/_pause_fireflies/', methods=['POST'])
+def _pause_fireflies():
+    data = request.get_json()
+
+    return request_and_respond("<firefliespause," + str(data['pause']) + ">")
+
+# Route to send the fireflies color. Hue only, like Fire.
+@app.route('/_post_fireflies_color/', methods=['POST'])
+def _post_fireflies_color():
+    data = request.get_json()
+    h = normalize_fireflies_hue(data['h'])
+
+    return request_and_respond("<fireflies,"+str(h)+">")
+
+# Endpoint for the fireflies glow and density sliders. A separate command from
+# <fireflies,H> for the same reason /_post_life_timing/ is separate from the
+# Life color endpoint -- see processFirefliesTiming() in the firmware.
+@app.route('/_post_fireflies_timing/', methods=['POST'])
+def _post_fireflies_timing():
+    data = request.get_json()
+    fade = normalize_fireflies_fade(data.get('fade'))
+    hold = normalize_fireflies_hold(data.get('hold'))
+    frequency = normalize_fireflies_frequency(data.get('frequency'))
+    variation = normalize_fireflies_variation(data.get('variation'))
+
+    return request_and_respond("<firefliestiming,"+str(fade)+","+str(hold)+","+str(frequency)+","+str(variation)+">")
 
 # Route for matrix.
 @app.route('/matrix')

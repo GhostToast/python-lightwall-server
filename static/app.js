@@ -143,7 +143,11 @@ if (window.location.pathname.indexOf('hsl-color') == 1) {
     addBodyClickBinding();
 }
 
-if (window.location.pathname.indexOf('fire') == 1) {
+// Exact match, not indexOf: '/fireflies'.indexOf('fire') is also 1, so the
+// loose test claimed the Fireflies page too and threw on
+// document.getElementById('pause-fire') being null, aborting the rest of
+// this file before the Fireflies block below could run.
+if (window.location.pathname === '/fire') {
     mode = 'fire';
     var fireButtons = document.getElementsByClassName('flames');
     var fireSpecialButtons = document.getElementsByClassName('flames-special');
@@ -164,6 +168,46 @@ if (window.location.pathname.indexOf('fire') == 1) {
     addBodyClickBinding();
     addFireModeClickBinding();
     addPausePlayFireButtonBinding();
+}
+
+if (window.location.pathname.indexOf('fireflies') == 1) {
+    mode = 'fireflies';
+    var sliders = document.getElementsByClassName('sliders');
+    var swatchContainer = document.getElementById('swatch-container');
+    var saveColor       = document.getElementById('save-color');
+    var previewElement  = document.getElementById('preview');
+    // Seeded at s=100/l=50 rather than [0,0,0]: this is a hue-only mode, and
+    // setInitialHueState() only fills s/l when initialState.h is truthy -- a
+    // hue of 0 (red) would otherwise leave the preview black.
+    var hsl = [0, 100, 50];
+
+    // Buttons
+    var pauseFirefliesButton = document.getElementById('pause-fireflies');
+    var playFirefliesButton = document.getElementById('play-fireflies');
+
+    // Glow/density sliders. Not part of the 'sliders' class collection above
+    // -- that one is iterated by hslColorPicker() as hue/saturation/
+    // lightness, and these four are neither.
+    var firefliesFadeSlider = document.getElementById('fireflies-fade-slider');
+    var firefliesHoldSlider = document.getElementById('fireflies-hold-slider');
+    var firefliesFrequencySlider = document.getElementById('fireflies-frequency-slider');
+    var firefliesVariationSlider = document.getElementById('fireflies-variation-slider');
+    var firefliesFadeMin = initialState.minFade || 100;
+    var firefliesFadeMax = initialState.maxFade || 2500;
+    var firefliesHoldMin = (initialState.minHold !== undefined) ? initialState.minHold : 0;
+    var firefliesHoldMax = initialState.maxHold || 3000;
+    var firefliesFade = initialState.fade || 700;
+    var firefliesHold = (initialState.hold !== undefined) ? initialState.hold : 300;
+    var firefliesFrequency = (initialState.frequency !== undefined) ? initialState.frequency : 40;
+    var firefliesVariation = (initialState.variation !== undefined) ? initialState.variation : 40;
+
+    setInitialHueState();
+    loadSwatches();
+    hslColorPicker();
+    addSwatchSaveBinding();
+    addBodyClickBinding();
+    addPausePlayFirefliesButtonBinding();
+    firefliesTimingControl();
 }
 
 // Initialize Matrix if on proper page.
@@ -517,6 +561,120 @@ function sendLifeTiming() {
             'content-type': 'application/json'
         },
         body: JSON.stringify({speed: lifeSpeed, organic: lifeOrganic, mutation: lifeColorMutation, ember: lifeEmber})
+    }).then(
+        response => response.text()
+    ).then(
+        html => console.log(html)
+    );
+}
+
+/**
+ * Fireflies' Fade (ms for each of fade-in and fade-out), Glow (ms held at full
+ * brightness), Frequency (0-100, how often one reignites), and Color
+ * Variation (0-100, how far each blink's hue may drift from the selected hue)
+ * sliders. Same split as lifeTimingControl(): every 'update' tick caches the
+ * handle position for instant feedback, and only 'change' (handle release)
+ * reaches the wall. Unlike Life's Speed slider there is no inversion anywhere
+ * here -- all four values already read the right way round, with more
+ * meaning more.
+ */
+function firefliesTimingControl() {
+    noUiSlider.create(firefliesFadeSlider, {
+        start: firefliesFade,
+        step: 1,
+        connect: 'lower',
+        tooltips: true,
+        range: {
+            'min': [firefliesFadeMin],
+            'max': [firefliesFadeMax]
+        },
+        format: {
+            to: function (value) { return parseInt(value); },
+            from: function (value) { return parseInt(value); }
+        }
+    });
+
+    noUiSlider.create(firefliesHoldSlider, {
+        start: firefliesHold,
+        step: 1,
+        connect: 'lower',
+        tooltips: true,
+        range: {
+            'min': [firefliesHoldMin],
+            'max': [firefliesHoldMax]
+        },
+        format: {
+            to: function (value) { return parseInt(value); },
+            from: function (value) { return parseInt(value); }
+        }
+    });
+
+    noUiSlider.create(firefliesFrequencySlider, {
+        start: firefliesFrequency,
+        step: 1,
+        connect: 'lower',
+        tooltips: true,
+        range: {
+            'min': [0],
+            'max': [100]
+        },
+        format: {
+            to: function (value) { return parseInt(value); },
+            from: function (value) { return parseInt(value); }
+        }
+    });
+
+    noUiSlider.create(firefliesVariationSlider, {
+        start: firefliesVariation,
+        step: 1,
+        connect: 'lower',
+        tooltips: true,
+        range: {
+            'min': [0],
+            'max': [100]
+        },
+        format: {
+            to: function (value) { return parseInt(value); },
+            from: function (value) { return parseInt(value); }
+        }
+    });
+
+    firefliesFadeSlider.noUiSlider.on('update', function () {
+        firefliesFade = parseInt(firefliesFadeSlider.noUiSlider.get());
+    });
+    firefliesFadeSlider.noUiSlider.on('change', function () {
+        sendFirefliesTiming();
+    });
+
+    firefliesHoldSlider.noUiSlider.on('update', function () {
+        firefliesHold = parseInt(firefliesHoldSlider.noUiSlider.get());
+    });
+    firefliesHoldSlider.noUiSlider.on('change', function () {
+        sendFirefliesTiming();
+    });
+
+    firefliesFrequencySlider.noUiSlider.on('update', function () {
+        firefliesFrequency = parseInt(firefliesFrequencySlider.noUiSlider.get());
+    });
+    firefliesFrequencySlider.noUiSlider.on('change', function () {
+        sendFirefliesTiming();
+    });
+
+    firefliesVariationSlider.noUiSlider.on('update', function () {
+        firefliesVariation = parseInt(firefliesVariationSlider.noUiSlider.get());
+    });
+    firefliesVariationSlider.noUiSlider.on('change', function () {
+        sendFirefliesTiming();
+    });
+}
+
+function sendFirefliesTiming() {
+    fetch('/_post_fireflies_timing/', {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json'
+        },
+        body: JSON.stringify({fade: firefliesFade, hold: firefliesHold, frequency: firefliesFrequency, variation: firefliesVariation})
     }).then(
         response => response.text()
     ).then(
@@ -930,6 +1088,42 @@ function addPausePlayFireButtonBinding() {
     });
 }
 
+function addPausePlayFirefliesButtonBinding() {
+    playFirefliesButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        playFirefliesButton.style.display = 'none';
+        pauseFirefliesButton.style.display = 'block';
+        fetch('/_pause_fireflies/', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify({pause: 0})
+        }).then(
+            response => response.text()
+        ).then(
+            html => console.log(html)
+        );
+    });
+
+    pauseFirefliesButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        pauseFirefliesButton.style.display = 'none';
+        playFirefliesButton.style.display = 'block';
+        fetch('/_pause_fireflies/', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify({pause: 1})
+        }).then(
+            response => response.text()
+        ).then(
+            html => console.log(html)
+        );
+    });
+}
+
 function addPausePlayMatrixButtonBinding() {
     pauseMatrixButton.addEventListener('click', function(e) {
         pauseMatrixButton.style.display = 'none';
@@ -1095,6 +1289,19 @@ function hslColorPicker() {
                 ).then(
                     html => console.log(html)
                 );
+            } else if (mode === 'fireflies') {
+                // Send color to server, to update light wall.
+                fetch('/_post_fireflies_color/', {
+                    method: 'POST',
+                    headers: {
+                        'content-type': 'application/json'
+                    },
+                    body: JSON.stringify({h: hslColors.h})
+                }).then(
+                    response => response.text()
+                ).then(
+                    html => console.log(html)
+                );
             }
         });
     });
@@ -1223,7 +1430,7 @@ function addSwatch(swatch) {
         swatchElement.setAttribute('data-s', swatch.s);
         swatchElement.setAttribute('data-l', swatch.l);
         swatchElement.addEventListener('click', swatchHSLClickHandler);
-    } else if (mode === 'fire') {
+    } else if (mode === 'fire' || mode === 'fireflies') {
         var styleColor = buildHSLPreviewColor(swatch);
         swatchElement.style.background = styleColor;
         swatchElement.setAttribute('data-h', swatch.h);
@@ -1262,7 +1469,7 @@ function buildHSLPreviewColor(hsl) {
         if (hsl.l) {
             preview.l = curveLightness(hsl.l);
         }
-    } else if (mode == 'fire') {
+    } else if (mode == 'fire' || mode == 'fireflies') {
         if (hsl.h) {
             preview.h = parseInt(hsl.h, 10);
         }
@@ -1394,7 +1601,7 @@ function swatchDeleteHandler(e) {
     e.stopPropagation();
     var swatchToDelete = e.target.closest('div.swatch');
     var swatchWrapper = e.target.closest('div.swatch-wrapper');
-    if (mode == 'hsl' || mode == 'life') {
+    if (mode == 'hsl' || mode == 'life' || mode == 'fireflies') {
         var swatchData = {
             h: parseInt(swatchToDelete.getAttribute('data-h')),
             s: parseInt(swatchToDelete.getAttribute('data-s')),
@@ -1418,7 +1625,7 @@ function swatchDeleteHandler(e) {
 function addSwatchSaveBinding() {
     saveColor.addEventListener('click', function(e) {
         saveColor.style.display = 'none';
-        if (mode === 'hsl' || mode === 'fire' || mode === 'life') {
+        if (mode === 'hsl' || mode === 'fire' || mode === 'life' || mode === 'fireflies') {
             swatch = getHSLColors();
         } else {
             swatch = getRGBWColors();
@@ -1434,7 +1641,7 @@ function saveSwatch(swatch) {
     swatch.type = 'rgbw';
     var endpoint = '/_rgbw_swatch_data/';
 
-    if (mode == 'hsl' || mode == 'fire' || mode == 'life') {
+    if (mode == 'hsl' || mode == 'fire' || mode == 'life' || mode == 'fireflies') {
         swatch.type = 'hsl';
         endpoint = '/_hsl_swatch_data/';
     }
@@ -1458,7 +1665,7 @@ function deleteSwatch(swatch) {
     swatch.type = 'rgbw';
     var endpoint = '/_rgbw_swatch_data/';
 
-    if (mode == 'hsl' || mode == 'fire' || mode == 'life') {
+    if (mode == 'hsl' || mode == 'fire' || mode == 'life' || mode == 'fireflies') {
         swatch.type = 'hsl';
         endpoint = '/_hsl_swatch_data/';
     }
