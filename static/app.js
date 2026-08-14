@@ -397,10 +397,10 @@ function addPausePlayLifeButtonBinding() {
 
 /**
  * Life's Speed (ms/generation, sent inverted -- see below), Organic (0-100,
- * per-cell fade stagger), Mutation (0-100, chance a surviving cell's hue
- * drifts each generation), and Ember (0-100, chance a death leaves an ember)
- * sliders. Built on the same split as spriteBrightnessControl(): the handle
- * position is tracked on every
+ * per-cell fade stagger), Mutation (0-100, chance a new cell's hue leaps far
+ * from its parent's instead of nearly matching it), and Ember (0-100, chance
+ * a death leaves an ember) sliders. Built on the same split as
+ * spriteBrightnessControl(): the handle position is tracked on every
  * 'update' tick for instant feedback, but the wall only hears about it on
  * 'change' (handle release). Each send is a blocking serial write behind a
  * process-wide mutex (see app.py's _serial_lock), so firing one per pixel of
