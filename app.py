@@ -170,6 +170,12 @@ LIFE_MAX_SPEED = 1500
 LIFE_DEFAULT_ORGANIC = 50
 LIFE_MIN_ORGANIC = 0
 LIFE_MAX_ORGANIC = 100
+LIFE_DEFAULT_MUTATION = 0
+LIFE_MIN_MUTATION = 0
+LIFE_MAX_MUTATION = 100
+LIFE_DEFAULT_EMBER = 25
+LIFE_MIN_EMBER = 0
+LIFE_MAX_EMBER = 100
 
 def normalize_life_speed(value):
     """Clamp to the range the firmware will accept, tolerating junk input."""
@@ -187,6 +193,22 @@ def normalize_life_organic(value):
         return LIFE_DEFAULT_ORGANIC
     return max(LIFE_MIN_ORGANIC, min(LIFE_MAX_ORGANIC, value))
 
+def normalize_life_mutation(value):
+    """Clamp to the range the firmware will accept, tolerating junk input."""
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return LIFE_DEFAULT_MUTATION
+    return max(LIFE_MIN_MUTATION, min(LIFE_MAX_MUTATION, value))
+
+def normalize_life_ember(value):
+    """Clamp to the range the firmware will accept, tolerating junk input."""
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return LIFE_DEFAULT_EMBER
+    return max(LIFE_MIN_EMBER, min(LIFE_MAX_EMBER, value))
+
 # Route for Conway's Game of Life.
 @app.route('/life')
 def life():
@@ -197,14 +219,16 @@ def life():
         'l': 0,
         'speed': LIFE_DEFAULT_SPEED,
         'organic': LIFE_DEFAULT_ORGANIC,
+        'mutation': LIFE_DEFAULT_MUTATION,
+        'ember': LIFE_DEFAULT_EMBER,
         'minSpeed': LIFE_MIN_SPEED,
         'maxSpeed': LIFE_MAX_SPEED,
         }
 
     state = get_state()
     if (b'life' == state[0]):
-        # <life,h,s,l,speed,organic> -- speed/organic are absent from an older
-        # firmware, so default rather than index off the end.
+        # <life,h,s,l,speed,organic,mutation,ember> -- newer fields are absent
+        # from an older firmware, so default rather than index off the end.
         initial_state = {
             'type': 'life',
             'h': state[1],
@@ -212,12 +236,15 @@ def life():
             'l': state[3],
             'speed': normalize_life_speed(state[4]) if len(state) > 4 else LIFE_DEFAULT_SPEED,
             'organic': normalize_life_organic(state[5]) if len(state) > 5 else LIFE_DEFAULT_ORGANIC,
+            'mutation': normalize_life_mutation(state[6]) if len(state) > 6 else LIFE_DEFAULT_MUTATION,
+            'ember': normalize_life_ember(state[7]) if len(state) > 7 else LIFE_DEFAULT_EMBER,
             'minSpeed': LIFE_MIN_SPEED,
             'maxSpeed': LIFE_MAX_SPEED,
             }
     elif (b'lifepause' == state[0]):
-        # <lifepause,N,speed,organic> -- no color here, so h/s/l stay at the
-        # defaults above, but the sliders still need to restore while paused.
+        # <lifepause,N,speed,organic,mutation,ember> -- no color here, so h/s/l
+        # stay at the defaults above, but the sliders still need to restore
+        # while paused.
         initial_state = {
             'type': 'life',
             'h': 0,
@@ -225,6 +252,8 @@ def life():
             'l': 0,
             'speed': normalize_life_speed(state[2]) if len(state) > 2 else LIFE_DEFAULT_SPEED,
             'organic': normalize_life_organic(state[3]) if len(state) > 3 else LIFE_DEFAULT_ORGANIC,
+            'mutation': normalize_life_mutation(state[4]) if len(state) > 4 else LIFE_DEFAULT_MUTATION,
+            'ember': normalize_life_ember(state[5]) if len(state) > 5 else LIFE_DEFAULT_EMBER,
             'minSpeed': LIFE_MIN_SPEED,
             'maxSpeed': LIFE_MAX_SPEED,
             }
@@ -256,8 +285,10 @@ def _post_life_timing():
     data = request.get_json()
     speed = normalize_life_speed(data.get('speed'))
     organic = normalize_life_organic(data.get('organic'))
+    mutation = normalize_life_mutation(data.get('mutation'))
+    ember = normalize_life_ember(data.get('ember'))
 
-    return request_and_respond("<lifetiming,"+str(speed)+","+str(organic)+">")
+    return request_and_respond("<lifetiming,"+str(speed)+","+str(organic)+","+str(mutation)+","+str(ember)+">")
 
 # Route for fire.
 @app.route('/fire')

@@ -61,10 +61,14 @@ if (window.location.pathname.indexOf('life') == 1) {
     // lightness, and these two are neither.
     var lifeSpeedSlider = document.getElementById('life-speed-slider');
     var lifeOrganicSlider = document.getElementById('life-organic-slider');
+    var lifeColorMutationSlider = document.getElementById('life-mutation-slider');
+    var lifeEmberSlider = document.getElementById('life-ember-slider');
     var lifeSpeedMin = initialState.minSpeed || 80;
     var lifeSpeedMax = initialState.maxSpeed || 1500;
     var lifeSpeed = initialState.speed || 370; // Milliseconds/generation, as sent to the wall.
     var lifeOrganic = (initialState.organic !== undefined) ? initialState.organic : 50;
+    var lifeColorMutation = (initialState.mutation !== undefined) ? initialState.mutation : 0;
+    var lifeEmber = (initialState.ember !== undefined) ? initialState.ember : 25;
 
     // Load for HSL Color Picker.
     setInitialHSLState();
@@ -392,9 +396,11 @@ function addPausePlayLifeButtonBinding() {
 }
 
 /**
- * Life's Speed (ms/generation, sent inverted -- see below) and Organic
- * (0-100, per-cell fade stagger) sliders. Built on the same split as
- * spriteBrightnessControl(): the handle position is tracked on every
+ * Life's Speed (ms/generation, sent inverted -- see below), Organic (0-100,
+ * per-cell fade stagger), Mutation (0-100, chance a surviving cell's hue
+ * drifts each generation), and Ember (0-100, chance a death leaves an ember)
+ * sliders. Built on the same split as spriteBrightnessControl(): the handle
+ * position is tracked on every
  * 'update' tick for instant feedback, but the wall only hears about it on
  * 'change' (handle release). Each send is a blocking serial write behind a
  * process-wide mutex (see app.py's _serial_lock), so firing one per pixel of
@@ -458,6 +464,50 @@ function lifeTimingControl() {
     lifeOrganicSlider.noUiSlider.on('change', function () {
         sendLifeTiming();
     });
+
+    noUiSlider.create(lifeColorMutationSlider, {
+        start: lifeColorMutation,
+        step: 1,
+        connect: 'lower',
+        tooltips: true,
+        range: {
+            'min': [0],
+            'max': [100]
+        },
+        format: {
+            to: function (value) { return parseInt(value); },
+            from: function (value) { return parseInt(value); }
+        }
+    });
+
+    noUiSlider.create(lifeEmberSlider, {
+        start: lifeEmber,
+        step: 1,
+        connect: 'lower',
+        tooltips: true,
+        range: {
+            'min': [0],
+            'max': [100]
+        },
+        format: {
+            to: function (value) { return parseInt(value); },
+            from: function (value) { return parseInt(value); }
+        }
+    });
+
+    lifeColorMutationSlider.noUiSlider.on('update', function () {
+        lifeColorMutation = parseInt(lifeColorMutationSlider.noUiSlider.get());
+    });
+    lifeColorMutationSlider.noUiSlider.on('change', function () {
+        sendLifeTiming();
+    });
+
+    lifeEmberSlider.noUiSlider.on('update', function () {
+        lifeEmber = parseInt(lifeEmberSlider.noUiSlider.get());
+    });
+    lifeEmberSlider.noUiSlider.on('change', function () {
+        sendLifeTiming();
+    });
 }
 
 function sendLifeTiming() {
@@ -466,7 +516,7 @@ function sendLifeTiming() {
         headers: {
             'content-type': 'application/json'
         },
-        body: JSON.stringify({speed: lifeSpeed, organic: lifeOrganic})
+        body: JSON.stringify({speed: lifeSpeed, organic: lifeOrganic, mutation: lifeColorMutation, ember: lifeEmber})
     }).then(
         response => response.text()
     ).then(
