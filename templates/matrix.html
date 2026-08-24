@@ -3,7 +3,7 @@
             <h1>Matrix Control</h1>
             <h3>Prebuilt</h3>
             <button type="button" class="btn bg-danger code-rain" id="red-code"
-                data-r="[192,256]"
+                data-r="[192,255]"
                 data-g="[0,8]"
                 data-b="[0,8]"
                 data-w="[0,0]"
@@ -12,7 +12,7 @@
             </button>
             <button type="button" class="btn bg-success code-rain" id="green-code"
                 data-r="[0,24]"
-                data-g="[192,256]"
+                data-g="[192,255]"
                 data-b="[0,32]"
                 data-w="[0,0]"
                 >
@@ -21,16 +21,34 @@
             <button type="button" class="btn bg-primary code-rain" id="blue-code"
                 data-r="[0,8]"
                 data-g="[0,96]"
-                data-b="[192,256]"
+                data-b="[192,255]"
                 data-w="[0,0]">
                 <i class="material-icons blue">code</i>
+            </button>
+            <button type="button" class="btn bg-purple code-rain" id="purple-code"
+                data-r="[96,160]"
+                data-g="[0,16]"
+                data-b="[160,255]"
+                data-w="[0,0]">
+                <i class="material-icons">code</i>
+            </button>
+            <button type="button" class="btn bg-amber code-rain" id="amber-code"
+                data-r="[200,255]"
+                data-g="[140,200]"
+                data-b="[0,16]"
+                data-w="[0,0]">
+                <i class="material-icons">code</i>
+            </button>
+            <button type="button" class="btn bg-danger code-rain-special" id="rainbow"
+                data-matrix-special="1">
+                <i class="material-icons red">code</i>
             </button>
 
             <h3>Customize</h3>
             <div class="sliders" id="red-slider"></div>
-            <div class="sliders" id="green-slider"/></div>
-            <div class="sliders" id="blue-slider"/></div>
-            <div class="sliders" id="white-slider"/></div>
+            <div class="sliders" id="green-slider"></div>
+            <div class="sliders" id="blue-slider"></div>
+            <div class="sliders" id="white-slider"></div>
             <button type="button" class="btn bg-warning" id="pause-matrix">
                 <i class="material-icons">pause</i>
             </button>

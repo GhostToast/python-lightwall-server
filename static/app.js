@@ -214,12 +214,14 @@ if (window.location.pathname.indexOf('fireflies') == 1) {
 if (window.location.pathname.indexOf('matrix') == 1) {
     mode = 'matrix';
     var matrixButtons = document.getElementsByClassName('code-rain');
+    var matrixSpecialButtons = document.getElementsByClassName('code-rain-special');
     var sliders = document.getElementsByClassName('sliders');
     var pauseMatrixButton = document.getElementById('pause-matrix');
     var playMatrixButton = document.getElementById('play-matrix');
-    var colors = [[0, 0], [0, 0], [0, 0], [0, 0]];
+    var colors = [[0, 16], [0, 16], [0, 16], [0, 16]];
 
     addColorModeClickBinding();
+    addMatrixSpecialClickBinding();
     addPausePlayMatrixButtonBinding();
     matrixColorSliders();
 }
@@ -388,12 +390,47 @@ function addColorModeClickBinding() {
                 JSON.parse(button.getAttribute('data-w'))
             ];
             e.preventDefault();
+
+            // Sync sliders + the shared colors array to the preset before
+            // sending -- previously a preset click never touched either,
+            // so the sliders kept showing stale values, and the *next*
+            // slider drag would silently revert the other three channels
+            // back to whatever they still displayed. fireSetEvent=false
+            // suppresses each slider's own 'set' handler (which otherwise
+            // POSTs individually) so this fires exactly one request below
+            // instead of four.
+            [].slice.call(sliders).forEach(function (slider, sliderIndex) {
+                colors[sliderIndex] = data[sliderIndex];
+                slider.noUiSlider.set(data[sliderIndex], false);
+            });
+
             fetch('/_post_matrix/', {
                 method: 'POST',
                 headers: {
                     'content-type': 'application/json'
                 },
-                body: JSON.stringify(data)
+                body: JSON.stringify(colors)
+            }).then(
+                response => response.text()
+            ).then(
+                html => console.log(html)
+            );
+        });
+    });
+}
+
+function addMatrixSpecialClickBinding() {
+    [].slice.call(matrixSpecialButtons).forEach(function (button, index) {
+        button.addEventListener('click', function(e) {
+            var button = e.target.closest('button.code-rain-special');
+            var special = parseInt(button.getAttribute('data-matrix-special'));
+            e.preventDefault();
+            fetch('/_post_matrix_special/', {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json'
+                },
+                body: JSON.stringify({special})
             }).then(
                 response => response.text()
             ).then(

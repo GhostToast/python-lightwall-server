@@ -494,8 +494,16 @@ def _post_matrix():
         str(data[3][1])+">")
 
     print ("Sending: " + request_string)
-    
+
     return request_and_respond(request_string)
+
+# Endpoint for posting Matrix special (rainbow) mode.
+@app.route('/_post_matrix_special/', methods=['POST'])
+def _post_matrix_special():
+    data = request.get_json()
+    special = data['special']
+
+    return request_and_respond("<specialmatrix,"+str(special)+">")
 
 # Route for Gradient picker.
 @app.route('/gradient-color')
