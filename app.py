@@ -4,7 +4,7 @@ from tinydb import TinyDB, Query
 from decouple import config
 import serial, json, threading
 
-import sprites, stock
+import sprites, stock, github
 
 # USB device, a Teensy 3.6 to send serial comms to.
 TEENSY = '/dev/serial/by-id/usb-Teensyduino_USB_Serial_5220260-if00'
@@ -826,7 +826,126 @@ def _post_sprites():
                     'layout': layout, 'brightness': brightness})
 
 
+# --- GitHub contribution calendar ------------------------------------------
+
+# The chosen username lives in TinyDB alongside everything else, so it
+# survives a restart. Only ever one record of this type.
+GITHUB_DEFAULT_USERNAME = 'GhostToast'
+
+def get_github_username():
+    record = db.get(Query().type == 'github')
+    return record['username'] if record else GITHUB_DEFAULT_USERNAME
+
+def set_github_username(username):
+    _update_github_record({'username': username})
+
+def get_github_brightness():
+    record = db.get(Query().type == 'github')
+    if record and 'brightness' in record:
+        return stock.normalize_brightness(record['brightness'])
+    return stock.DEFAULT_BRIGHTNESS
+
+def set_github_brightness(value):
+    _update_github_record({'brightness': stock.normalize_brightness(value)})
+
+def _update_github_record(fields):
+    query = Query()
+    if db.get(query.type == 'github'):
+        db.update(fields, query.type == 'github')
+    else:
+        record = {'type': 'github', 'username': GITHUB_DEFAULT_USERNAME,
+                  'brightness': stock.DEFAULT_BRIGHTNESS}
+        record.update(fields)
+        db.insert(record)
+
+def github_is_active():
+    return _active_command == 'github'
+
+# Refreshes the wall while it is on github mode. Collaborators are passed in
+# so github.py never has to import this module back.
+github_poller = github.Poller(
+    send=send,
+    get_username=get_github_username,
+    is_active=github_is_active,
+    get_brightness=get_github_brightness,
+    )
+
+# Route for the GitHub contribution calendar.
+@app.route('/github')
+def github_page():
+    # No get_state() call here, for the same reason /stock skips it: the
+    # username comes from the database, and there is nothing else about this
+    # mode the Teensy knows better than we do.
+    initial_state = {
+        'type': 'github',
+        'username': get_github_username(),
+        'weeks': github.GRID_WEEKS,
+        'days': github.GRID_DAYS,
+        'brightness': get_github_brightness(),
+        'minBrightness': stock.MIN_BRIGHTNESS,
+        'maxBrightness': stock.MAX_BRIGHTNESS,
+        }
+
+    return render_template('github.html', initialState=initial_state)
+
+# Endpoint for choosing which GitHub username to display.
+@app.route('/_post_github/', methods=['POST'])
+def _post_github():
+    data = request.get_json()
+    username = github.normalize_username(data.get('username', ''))
+    if not username:
+        return jsonify({'error': 'Enter a GitHub username.'}), 400
+
+    # Fetch before persisting, so a typo is reported rather than saved. force
+    # sends the frame even though the wall is not on github mode yet, which is
+    # what actually switches it over.
+    try:
+        result = github_poller.push(username, force=True)
+    except github.GithubError as error:
+        return jsonify({'error': str(error)}), 400
+    except (serial.SerialException, OSError) as error:
+        return jsonify({'error': str(error)}), 503
+
+    set_github_username(username)
+    _note_active_mode('<github')
+
+    return jsonify({
+        'response': 'ok',
+        'username': result['username'],
+        'activeDays': result['active_days'],
+        })
+
+# Endpoint for the overall brightness of the GitHub calendar.
+@app.route('/_post_github_brightness/', methods=['POST'])
+def _post_github_brightness():
+    data = request.get_json()
+    brightness = stock.normalize_brightness(data.get('brightness'))
+    set_github_brightness(brightness)
+
+    # Redraw from cache rather than refetching: only a display setting
+    # changed, so going back to GitHub would be pointless and would burn a
+    # request against the scrape endpoint.
+    try:
+        github_poller.repaint()
+    except github.GithubError:
+        # No data cached yet, so there is nothing to redraw. The value is
+        # saved and will apply to the first frame.
+        pass
+    except (serial.SerialException, OSError) as error:
+        return jsonify({'error': str(error)}), 503
+
+    return jsonify({'response': 'ok', 'brightness': brightness})
+
+# Endpoint for the web UI's preview, which renders the same layout as the wall.
+@app.route('/_github_data/')
+def _github_data():
+    snapshot = github_poller.snapshot()
+    snapshot['username'] = get_github_username()
+    return jsonify(snapshot)
+
+
 # Run locally, accessible via any device on network.
 if __name__ == '__main__':
     poller.start()
+    github_poller.start()
     app.run(debug=False, host='0.0.0.0', port=config('PORT'))

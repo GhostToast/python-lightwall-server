@@ -1,0 +1,53 @@
+{% include '_header.html' %}
+
+            <script>
+                initialState = JSON.parse('{{initialState | tojson | safe}}');
+            </script>
+            <h1>GitHub Activity</h1>
+
+            <form id="github-form" class="form-inline my-3">
+                <input type="text" class="form-control mr-2" id="github-username"
+                       placeholder="GhostToast" maxlength="39"
+                       autocomplete="off" aria-label="GitHub username">
+                <button type="submit" class="btn btn-light" id="set-username">
+                    <i class="material-icons">send</i>
+                </button>
+            </form>
+
+            <p id="github-status"></p>
+
+            <!-- Overall brightness. Lives here rather than in the firmware
+                 because what looks right in person is far too bright for a
+                 webcam, and switching between the two should not need a
+                 reflash. -->
+            <label for="github-brightness-slider">Brightness</label>
+            <div class="sliders" id="github-brightness-slider"></div>
+
+            <!-- Mirrors what the wall draws, struts and all, so the layout can be
+                 checked without standing in front of it. Dimensions are set in
+                 app.js from the cell metrics, so they always match the content. -->
+            <canvas id="github-preview"></canvas>
+
+            <!-- Swatch colours and the day count are filled in by app.js from the
+                 same values the preview draws with, so the legend cannot drift
+                 out of step with the calendar it describes. -->
+            <section id="github-legend">
+                <h2>Reading the calendar</h2>
+                <dl>
+                    <dt><span class="legend-swatch" data-token="0"></span> Darkest</dt>
+                    <dd>No contributions that day.</dd>
+
+                    <dt><span class="legend-swatch" data-token="4"></span> Brightest</dt>
+                    <dd>The busiest days, GitHub's own top bucket.</dd>
+
+                    <dt>Columns</dt>
+                    <dd>One per week, <span data-weeks>32</span> in all. Oldest
+                        on the left, this week on the right.</dd>
+
+                    <dt>Rows</dt>
+                    <dd>One per day of the week, Sunday at the top through
+                        Saturday at the bottom.</dd>
+                </dl>
+            </section>
+
+{% include '_footer.html' %}

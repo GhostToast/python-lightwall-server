@@ -99,32 +99,37 @@ body {
     display: none;
 }
 
-#stock-preview {
+#stock-preview,
+#github-preview {
     background: #000;
     border: 1px solid #404040;
     border-radius: .25rem;
     margin-top: 12px;
 }
 
-#stock-legend {
+#stock-legend,
+#github-legend {
     margin-top: 24px;
     max-width: 34rem;
 }
 
-#stock-legend h2 {
+#stock-legend h2,
+#github-legend h2 {
     font-size: 1rem;
     color: #a0a0a0;
     border-bottom: 1px solid #404040;
     padding-bottom: 6px;
 }
 
-#stock-legend dt {
+#stock-legend dt,
+#github-legend dt {
     color: #b0b0b0;
     font-weight: normal;
     margin-top: 10px;
 }
 
-#stock-legend dd {
+#stock-legend dd,
+#github-legend dd {
     margin: 2px 0 0 0;
     font-size: .875rem;
     color: #808080;

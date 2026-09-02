@@ -26,6 +26,16 @@ var stockColors = {
     '-': '#3a3a3a', // baseline   - neutral white channel
     '@': '#cfcfcf'  // text       - neutral white channel
 };
+
+// Mirrors githubLevelLight in lightwall.ino and github.py: one canonical
+// hue(120)/saturation(100)/lightness ramp, kept in sync across all three
+// files rather than re-picked by eye here (see stockColors' own comment above
+// about why that matters).
+var githubLevelLight = [2, 8, 16, 26, 40];
+var githubColors = {' ': '#080808'};
+githubLevelLight.forEach(function (lightness, level) {
+    githubColors[String(level)] = 'hsl(120, 100%, ' + lightness + '%)';
+});
 // Initialize RGBW Color picker if on proper page.
 if (window.location.pathname.indexOf('rgbw-color') == 1) {
     mode = 'rgbw';
@@ -101,6 +111,28 @@ if (window.location.pathname.indexOf('stock') == 1) {
 
     // The poller refreshes during market hours, so keep the preview in step.
     setInterval(loadStockPreview, 60000);
+}
+
+if (window.location.pathname.indexOf('github') == 1) {
+    mode = 'github';
+
+    var githubForm = document.getElementById('github-form');
+    var githubUsername = document.getElementById('github-username');
+    var githubStatus = document.getElementById('github-status');
+    var githubPreview = document.getElementById('github-preview');
+    var githubBrightnessSlider = document.getElementById('github-brightness-slider');
+    var githubBrightness = initialState.brightness || 155;
+
+    // There is no pause control here, unlike the animated modes -- this
+    // calendar is a still image, so there is nothing to pause.
+    githubUsername.value = initialState.username || '';
+    fillGithubLegend();
+    addGithubUsernameBinding();
+    githubBrightnessControl();
+    loadGithubPreview();
+
+    // The poller refreshes in the background, so keep the preview in step.
+    setInterval(loadGithubPreview, 60000);
 }
 
 if (window.location.pathname.indexOf('sprites') == 1) {
@@ -1079,6 +1111,202 @@ function drawStockPreview(cells, stale) {
     for (var y = 0; y < cells.length; y++) {
         for (var x = 0; x < cells[y].length; x++) {
             context.fillStyle = stockColors[cells[y][x]] || stockColors[' '];
+            context.fillRect(
+                x * cell + Math.floor(x / 8) * strut,
+                y * cell + Math.floor(y / 8) * strut,
+                cell - gap, cell - gap);
+        }
+    }
+
+    context.globalAlpha = 1;
+}
+
+// --- GitHub contribution calendar ------------------------------------------
+
+/**
+ * Colour the legend swatches and fill in the week count. Mirrors
+ * fillStockLegend() -- both come from the values the calendar is actually
+ * drawn with, rather than being written into the template.
+ */
+function fillGithubLegend() {
+    var swatchElements = document.getElementsByClassName('legend-swatch');
+    for (var i = 0; i < swatchElements.length; i++) {
+        var token = swatchElements[i].getAttribute('data-token');
+        swatchElements[i].style.background = githubColors[token] || githubColors[' '];
+    }
+
+    var weeks = initialState.weeks || 32;
+    var weekElements = document.querySelectorAll('[data-weeks]');
+    for (var j = 0; j < weekElements.length; j++) {
+        weekElements[j].textContent = weeks;
+    }
+}
+
+function addGithubUsernameBinding() {
+    githubForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var username = githubUsername.value.trim();
+        if (!username) {
+            return;
+        }
+        githubUsername.value = username;
+        githubStatus.textContent = 'Fetching ' + username + '...';
+
+        fetch('/_post_github/', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify({username: username})
+        }).then(function(response) {
+            // A 500 returns an HTML error page, not JSON, so parsing it
+            // throws -- read the body as text first and report what
+            // actually came back, same reasoning as addStockSymbolBinding().
+            return response.text().then(function(text) {
+                var body = null;
+                try {
+                    body = JSON.parse(text);
+                } catch (e) {
+                    body = null;
+                }
+                return {ok: response.ok, status: response.status, body: body, text: text};
+            });
+        }).then(function(result) {
+            if (!result.body) {
+                console.error('Non-JSON response from /_post_github/:', result.text);
+                githubStatus.textContent = 'Server error ' + result.status +
+                    ' - check the server console for the traceback.';
+                return;
+            }
+            if (!result.ok) {
+                githubStatus.textContent = result.body.error ||
+                    ('Could not load that username (' + result.status + ').');
+                return;
+            }
+            githubStatus.textContent = result.body.username + ': ' +
+                result.body.activeDays + ' active day(s).';
+            loadGithubPreview();
+        }).catch(function(error) {
+            console.error('Request to /_post_github/ failed:', error);
+            githubStatus.textContent = 'Request failed: ' + error.message;
+        });
+    });
+}
+
+/**
+ * Overall brightness for the GitHub calendar. Mirrors stockBrightnessControl()
+ * -- fires on 'change' rather than 'update' so dragging the handle does not
+ * send a frame per pixel of travel, while the preview follows continuously.
+ */
+function githubBrightnessControl() {
+    noUiSlider.create(githubBrightnessSlider, {
+        start: githubBrightness,
+        step: 1,
+        connect: 'lower',
+        tooltips: true,
+        range: {
+            'min': [initialState.minBrightness || 5],
+            'max': [initialState.maxBrightness || 255]
+        },
+        format: {
+            to: function (value) { return parseInt(value); },
+            from: function (value) { return parseInt(value); }
+        }
+    });
+
+    // Bind keyboard, matching the other sliders on the site.
+    var handle = githubBrightnessSlider.querySelector('.noUi-handle');
+    handle.addEventListener('keydown', function (e) {
+        var value = parseInt(githubBrightnessSlider.noUiSlider.get());
+        if (e.which === 37) {
+            githubBrightnessSlider.noUiSlider.set(value - 1);
+        }
+        if (e.which === 39) {
+            githubBrightnessSlider.noUiSlider.set(value + 1);
+        }
+    });
+
+    // Track the handle locally for instant preview feedback...
+    githubBrightnessSlider.noUiSlider.on('update', function () {
+        githubBrightness = parseInt(githubBrightnessSlider.noUiSlider.get());
+        if (lastGithubCells) {
+            drawGithubPreview(lastGithubCells, lastGithubStale);
+        }
+    });
+
+    // ...but only tell the wall once the handle is released.
+    githubBrightnessSlider.noUiSlider.on('change', function () {
+        fetch('/_post_github_brightness/', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify({brightness: githubBrightness})
+        }).then(
+            response => response.json()
+        ).then(function (body) {
+            if (body.error) {
+                githubStatus.textContent = body.error;
+            }
+        }).catch(function (error) {
+            console.error('Request to /_post_github_brightness/ failed:', error);
+            githubStatus.textContent = 'Brightness not applied: ' + error.message;
+        });
+    });
+}
+
+// Last grid received, kept so the brightness slider can redraw the preview
+// without another round trip to the server.
+var lastGithubCells = null;
+var lastGithubStale = false;
+
+function loadGithubPreview() {
+    fetch('/_github_data/').then(
+        response => response.json()
+    ).then(function(snapshot) {
+        if (snapshot.error) {
+            githubStatus.textContent = snapshot.error;
+        }
+        if (snapshot.data && snapshot.data.cells) {
+            lastGithubCells = snapshot.data.cells;
+            lastGithubStale = snapshot.data.stale;
+            drawGithubPreview(lastGithubCells, lastGithubStale);
+        }
+    }).catch(function(error) {
+        // Never fail silently here either -- without this a broken preview
+        // looks identical to a preview that simply has no data yet.
+        console.error('Request to /_github_data/ failed:', error);
+    });
+}
+
+/**
+ * Paint what the wall is drawing. Same cell/strut/gap metrics as
+ * drawStockPreview() -- this is the same 32x32 chart space with the same
+ * physical struts, just filled with day-blocks instead of a sparkline, so the
+ * preview stays pixel-honest about their 1x4 aspect ratio rather than
+ * prettying them into squares that don't match the wall.
+ */
+function drawGithubPreview(cells, stale) {
+    var context = githubPreview.getContext('2d');
+    var cell = 9;   // Pixel size in the preview.
+    var strut = 3;  // Drawn gap between panels.
+    var gap = 1;    // Space between pixels, so individual LEDs read as dots.
+
+    var extent = 32 * cell + 3 * strut - gap;
+    githubPreview.width = extent;
+    githubPreview.height = extent;
+
+    context.fillStyle = '#000';
+    context.fillRect(0, 0, extent, extent);
+
+    // Reflect the brightness setting, floored so the preview never goes so
+    // dark it looks broken.
+    var level = Math.max(0.3, githubBrightness / 255);
+    context.globalAlpha = stale ? level * 0.5 : level;
+
+    for (var y = 0; y < cells.length; y++) {
+        for (var x = 0; x < cells[y].length; x++) {
+            context.fillStyle = githubColors[cells[y][x]] || githubColors[' '];
             context.fillRect(
                 x * cell + Math.floor(x / 8) * strut,
                 y * cell + Math.floor(y / 8) * strut,
