@@ -49,20 +49,30 @@ import stock  # Sibling module, not an external dependency -- reuses its
 # scroll-position round-trip.
 #
 # Day-cells are square: DAY_BLOCK rows tall AND DAY_BLOCK columns wide, so one
-# week is DAY_BLOCK screen-columns, not one. The 32-week preview slice below
-# (what the browser sees) is unrelated to this -- it is just a tail window
-# for a sanity-check rendering, same 1-col/week compact style as before.
+# week is DAY_BLOCK screen-columns, not one. Within that footprint, only the
+# leading (DAY_BLOCK - 1) rows/columns are actually lit -- the trailing row
+# and column are left dark as a 1px gap, so adjacent cells read as distinct
+# squares instead of blending into one solid blob. The gap is carved out of
+# each cell's own footprint rather than inserted between cells, so it costs
+# no extra chart width: a week is still exactly DAY_BLOCK screen-columns, the
+# same number of weeks are still visible at once, and no cell's data is ever
+# split across the gap or hidden by it.
+#
+# The browser preview mirrors this shape exactly, just as a tail window --
+# CHART_W // DAY_BLOCK weeks, the same width the wall shows at any instant,
+# not a scroll-phase-accurate mirror of it (the firmware owns that offset
+# independently).
 
 CHART_W = 32
 CHART_H = 32
 
 GRID_DAYS = 7
-DAY_BLOCK = 4                         # Rows (and columns) per day-square.
+DAY_BLOCK = 4                         # Rows (and columns) per day-square, gap row/column included.
 TOP_MARGIN = (CHART_H - GRID_DAYS * DAY_BLOCK) // 2  # 2.
 
-PREVIEW_WEEKS = 32   # Tail slice shown in the browser preview -- unchanged.
+PREVIEW_WEEKS = CHART_W // DAY_BLOCK  # Weeks visible in the preview at this cell width -- 8.
 HISTORY_YEARS = 5    # Default lifetime window fetched from GitHub.
-WEEKS_PER_YEAR = 53  # Slack over 52 so the grid never runs short at the edge.
+WEEKS_PER_YEAR = 53  # Only used to report an approximate year count in render_ascii; the grid itself is sized from real fetch boundaries, not this.
 
 PAD = '_'  # Unused here (no text bands), kept for symmetry with stock.py.
 
@@ -159,17 +169,26 @@ def fetch_current_year(username, today=None):
 
 def _full_grid(days_by_date, years=HISTORY_YEARS, today=None):
     """
-    Sunday-aligned window of years * WEEKS_PER_YEAR weeks, ending with the
-    current partial week -- the lifetime-scroll analogue of the old
-    32-week _window_grid. Because the window starts on a Sunday, the loop
-    index *is* week*7+weekday with no extra math. Dates the scrape didn't
-    return (before the account existed, say) default to level 0 -- a blank
-    square is the correct answer there, not a workaround.
+    Sunday-aligned window running from the oldest date fetch_historical()
+    actually queries (Jan 1 of today.year - years + 1) through the current
+    partial week -- the lifetime-scroll analogue of the old 32-week
+    _window_grid. Anchored to that real fetch boundary rather than a fixed
+    years * WEEKS_PER_YEAR week count: counting back a fixed number of weeks
+    from today overshoots how far fetch_historical/fetch_current_year
+    actually reach, and the overshot cells silently default to level 0 --
+    indistinguishable from real quiet weeks, which read as a chunk of missing
+    history that never appears no matter how long the scroll runs.
+
+    Because the window starts on a Sunday, the loop index *is*
+    week*7+weekday with no extra math. Dates the scrape didn't return
+    (before the account existed, say) default to level 0 -- a blank square
+    is the correct answer there, not a workaround.
     """
     today = today or date.today()
     this_sunday = today - timedelta(days=(today.weekday() + 1) % 7)
-    total_weeks = years * WEEKS_PER_YEAR
-    start = this_sunday - timedelta(weeks=total_weeks - 1)
+    earliest = date(today.year - years + 1, 1, 1)
+    start = earliest - timedelta(days=(earliest.weekday() + 1) % 7)
+    total_weeks = (this_sunday - start).days // 7 + 1
     cells = total_weeks * GRID_DAYS
     grid = [0] * cells
     for i in range(cells):
@@ -281,13 +300,14 @@ ASCII_TOKENS = {
 
 def render_cells(frame, weeks=PREVIEW_WEEKS):
     """
-    Turn an encoded frame into a 32x32 grid of tokens, mirroring what the
-    browser preview draws: the most recent `weeks` weeks of whatever grid the
-    frame carries, laid out in the original 1-col/week compact style. The
-    wall itself no longer draws this -- it scrolls continuously through the
-    full grid on its own clock -- so this is a tail-slice sanity check, not a
-    live mirror. Deliberately renders from the encoded frame rather than the
-    raw grid, so this doubles as a round-trip check of the wire format.
+    Turn an encoded frame into a 32x32 grid of tokens: the most recent `weeks`
+    weeks of whatever grid the frame carries, laid out as square day-cells
+    with the same trailing 1px gap the firmware's githubShow() leaves --
+    see the geometry comment above. The wall itself no longer draws a static
+    window like this -- it scrolls continuously through the full grid on its
+    own clock -- so this is a tail-slice sanity check, not a live mirror.
+    Deliberately renders from the encoded frame rather than the raw grid, so
+    this doubles as a round-trip check of the wire format.
     """
     data = decode_frame(frame)
     grid = data['grid']
@@ -297,11 +317,13 @@ def render_cells(frame, weeks=PREVIEW_WEEKS):
 
     cells = [[CELL_EMPTY] * CHART_W for _ in range(CHART_H)]
     for week in range(weeks):
+        left = week * DAY_BLOCK
         for day in range(GRID_DAYS):
             token = str(tail[week * GRID_DAYS + day])
             top = TOP_MARGIN + day * DAY_BLOCK
-            for sub in range(DAY_BLOCK):
-                cells[top + sub][week] = token
+            for sub in range(DAY_BLOCK - 1):        # Trailing row left as a gap.
+                for col in range(DAY_BLOCK - 1):    # Trailing column left as a gap.
+                    cells[top + sub][left + col] = token
 
     return [''.join(row) for row in cells]
 

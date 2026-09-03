@@ -1283,9 +1283,10 @@ function loadGithubPreview() {
 /**
  * Paint what the wall is drawing. Same cell/strut/gap metrics as
  * drawStockPreview() -- this is the same 32x32 chart space with the same
- * physical struts, just filled with day-blocks instead of a sparkline, so the
- * preview stays pixel-honest about their 1x4 aspect ratio rather than
- * prettying them into squares that don't match the wall.
+ * physical struts, just filled with square day-blocks (and the thin gap
+ * between them) instead of a sparkline. The shape comes entirely from the
+ * token grid github.py hands over; this loop is agnostic to what the tokens
+ * represent.
  */
 function drawGithubPreview(cells, stale) {
     var context = githubPreview.getContext('2d');
