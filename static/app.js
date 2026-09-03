@@ -31,8 +31,10 @@ var stockColors = {
 // saturation(100)/lightness ramp, kept in sync across both files rather than
 // re-picked by eye here (see stockColors' own comment above about why that
 // matters). Level 0 is 0 -- true black, matching the untouched margin rows --
-// not just dim, or a no-commit day never reads as blank.
-var githubLevelLight = [0, 8, 16, 26, 40];
+// not just dim, or a no-commit day never reads as blank. 1-4 spread wide
+// (roughly even jumps in actual channel output, not raw lightness) so the
+// steps read as distinct rather than blurring together.
+var githubLevelLight = [0, 12, 24, 35, 50];
 var githubColors = {' ': '#080808'};
 githubLevelLight.forEach(function (lightness, level) {
     githubColors[String(level)] = 'hsl(120, 100%, ' + lightness + '%)';
