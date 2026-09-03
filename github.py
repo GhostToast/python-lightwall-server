@@ -68,7 +68,17 @@ CHART_H = 32
 
 GRID_DAYS = 7
 DAY_BLOCK = 4                         # Rows (and columns) per day-square, gap row/column included.
-TOP_MARGIN = (CHART_H - GRID_DAYS * DAY_BLOCK) // 2  # 2.
+# The wall is 4 panels stacked vertically, 8 rows each -- a physical strut
+# sits between every panel, permanently (rows never scroll, unlike columns).
+# 7 days * DAY_BLOCK leaves a remainder of 4 rows against the 32-row chart;
+# splitting that remainder top/bottom (the old (CHART_H - ...) // 2 = 2)
+# offsets every day-block by 2, which is not a multiple of DAY_BLOCK, so
+# every other day straddles a strut and is permanently sliced in half. Only
+# a margin that is itself a multiple of DAY_BLOCK keeps every block inside
+# one panel-half. The remainder can't be split evenly (2 isn't a multiple of
+# 4), so it all goes on one side -- here, the bottom, leaving Sunday flush
+# with the top edge.
+TOP_MARGIN = 0
 
 PREVIEW_WEEKS = CHART_W // DAY_BLOCK  # Weeks visible in the preview at this cell width -- 8.
 HISTORY_YEARS = 5    # Default lifetime window fetched from GitHub.
