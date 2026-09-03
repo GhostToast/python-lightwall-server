@@ -27,11 +27,12 @@ var stockColors = {
     '@': '#cfcfcf'  // text       - neutral white channel
 };
 
-// Mirrors githubLevelLight in lightwall.ino and github.py: one canonical
-// hue(120)/saturation(100)/lightness ramp, kept in sync across all three
-// files rather than re-picked by eye here (see stockColors' own comment above
-// about why that matters).
-var githubLevelLight = [2, 8, 16, 26, 40];
+// Mirrors githubLevelLight in lightwall.ino: one canonical hue(120)/
+// saturation(100)/lightness ramp, kept in sync across both files rather than
+// re-picked by eye here (see stockColors' own comment above about why that
+// matters). Level 0 is 0 -- true black, matching the untouched margin rows --
+// not just dim, or a no-commit day never reads as blank.
+var githubLevelLight = [0, 8, 16, 26, 40];
 var githubColors = {' ': '#080808'};
 githubLevelLight.forEach(function (lightness, level) {
     githubColors[String(level)] = 'hsl(120, 100%, ' + lightness + '%)';

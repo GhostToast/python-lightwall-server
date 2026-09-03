@@ -879,7 +879,7 @@ def github_page():
     initial_state = {
         'type': 'github',
         'username': get_github_username(),
-        'weeks': github.GRID_WEEKS,
+        'weeks': github.PREVIEW_WEEKS,
         'days': github.GRID_DAYS,
         'brightness': get_github_brightness(),
         'minBrightness': stock.MIN_BRIGHTNESS,
@@ -900,7 +900,7 @@ def _post_github():
     # sends the frame even though the wall is not on github mode yet, which is
     # what actually switches it over.
     try:
-        result = github_poller.push(username, force=True)
+        result = github_poller.push(username, force=True, full=True)
     except github.GithubError as error:
         return jsonify({'error': str(error)}), 400
     except (serial.SerialException, OSError) as error:
