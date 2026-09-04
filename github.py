@@ -234,16 +234,21 @@ def fetch(username, years=HISTORY_YEARS):
         raise GithubError('no contribution data for %s' % username)
 
     grid, active_days = _grid_from_days(days, years, today)
-    return {'username': username, 'grid': grid, 'active_days': active_days}
+    # The grid's own last cell is the end of the *current calendar week*
+    # (Saturday), not today -- looking today up directly in the merged days
+    # dict is what actually answers "today's level".
+    today_level = days.get(today.isoformat(), 0)
+    return {'username': username, 'grid': grid, 'active_days': active_days,
+            'today_level': today_level}
 
 
 # --- Frame building ----------------------------------------------------------
 
-def build_frame(grid, brightness, stale=False):
+def build_frame(grid, brightness, stale=False, today_level=0):
     """
     Produce the serial frame for one update.
 
-        <github,LLLLLLLL...L (grid chars, a multiple of 7),F,NNN>
+        <github,LLLLLLLL...L (grid chars, a multiple of 7),F,NNN,T>
 
     L  contribution levels, one character per day, '0'-'4', flat index
        week*7+day, oldest week first. Length varies with how many years of
@@ -251,6 +256,11 @@ def build_frame(grid, brightness, stale=False):
        much arrives.
     F  flag bitfield; bit0 set means the data is stale
     N  overall brightness, 5-255 as decimal
+    T  today's contribution level, '0'-'4' -- drives the breathing glow in
+       githubShow()'s reserved margin rows. Sent explicitly rather than
+       inferred from the grid's own last cell, because that cell is the end
+       of the current *calendar week* (Saturday), which is usually a future
+       date, not today.
 
     No default for brightness -- the caller always supplies one, matching
     sprite_frame(layout, brightness)'s precedent in app.py.
@@ -260,9 +270,10 @@ def build_frame(grid, brightness, stale=False):
 
     series = ''.join(str(min(4, max(0, level))) for level in grid)
     flags = 1 if stale else 0
+    today_level = min(4, max(0, today_level))
 
-    return '<github,%s,%d,%d>' % (
-        series, flags, stock.normalize_brightness(brightness))
+    return '<github,%s,%d,%d,%d>' % (
+        series, flags, stock.normalize_brightness(brightness), today_level)
 
 
 def decode_frame(frame):
@@ -271,10 +282,10 @@ def decode_frame(frame):
     if not (body.startswith('<') and body.endswith('>')):
         raise ValueError('frame is not delimited by <>')
     parts = body[1:-1].split(',')
-    if len(parts) != 4 or parts[0] != 'github':
+    if len(parts) != 5 or parts[0] != 'github':
         raise ValueError('unexpected frame shape: %r' % (parts,))
 
-    series, flags, brightness = parts[1:4]
+    series, flags, brightness, today_level = parts[1:5]
     if len(series) % GRID_DAYS != 0:
         raise ValueError(
             'grid length must be a multiple of %d days, got %d' % (GRID_DAYS, len(series)))
@@ -283,6 +294,7 @@ def decode_frame(frame):
         'grid': [int(c) for c in series],
         'stale': bool(int(flags) & 1),
         'brightness': int(brightness),
+        'today_level': int(today_level),
     }
 
 
@@ -430,7 +442,8 @@ class Poller(threading.Thread):
             cache['brightness'] = brightness
             try:
                 cache['cells'] = render_cells(build_frame(
-                    cache['grid'], brightness, stale=cache['stale']))
+                    cache['grid'], brightness, stale=cache['stale'],
+                    today_level=cache['today_level']))
             except (GithubError, ValueError):
                 cache['cells'] = None
         return {'data': cache, 'error': error, 'brightness': brightness}
@@ -467,6 +480,9 @@ class Poller(threading.Thread):
             raise GithubError('no contribution data for %s' % username)
 
         grid, active_days = _grid_from_days(days, HISTORY_YEARS, today)
+        # Same reasoning as fetch(): the grid's own last cell is the end of
+        # the current calendar week (usually a future date), not today.
+        today_level = days.get(today.isoformat(), 0)
 
         with self._lock:
             self._historical_days = historical
@@ -474,6 +490,7 @@ class Poller(threading.Thread):
                 'username': username,
                 'grid': grid,
                 'active_days': active_days,
+                'today_level': today_level,
                 'fetched_at': time.time(),
             }
             self._error = None
@@ -481,7 +498,7 @@ class Poller(threading.Thread):
 
         # Only put a frame on the wire when it would actually change the wall.
         if force or self._is_active():
-            frame = build_frame(grid, self._get_brightness())
+            frame = build_frame(grid, self._get_brightness(), today_level=today_level)
             if force or frame != self._last_frame:
                 self._send(frame)
                 self._last_frame = frame
@@ -499,7 +516,8 @@ class Poller(threading.Thread):
             raise GithubError('nothing to redraw yet')
 
         frame = build_frame(cache['grid'], self._get_brightness(),
-                            stale=self._is_stale(cache))
+                            stale=self._is_stale(cache),
+                            today_level=cache['today_level'])
         self._send(frame)
         self._last_frame = frame
 
@@ -541,7 +559,8 @@ class Poller(threading.Thread):
             return
         try:
             frame = build_frame(cache['grid'], self._get_brightness(),
-                                stale=self._is_stale(cache))
+                                stale=self._is_stale(cache),
+                                today_level=cache['today_level'])
             if frame != self._last_frame:
                 self._send(frame)
                 self._last_frame = frame
@@ -562,7 +581,9 @@ def _preview(usernames):
             status = 1
             continue
 
-        frame = build_frame(data['grid'], stock.DEFAULT_BRIGHTNESS)
+        frame = build_frame(data['grid'], stock.DEFAULT_BRIGHTNESS,
+                            today_level=data['today_level'])
+        print('today: level %d' % data['today_level'])
         print('frame (%d payload chars): %s' % (len(frame) - 2, frame))
         print(render_ascii(frame))
     return status
