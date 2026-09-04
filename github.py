@@ -205,15 +205,24 @@ def _full_grid(days_by_date, years=HISTORY_YEARS, today=None):
         level = days_by_date.get((start + timedelta(days=i)).isoformat())
         if level is not None:
             grid[i] = level
-    return grid
+    return grid, start
 
 
 def _grid_from_days(days_by_date, years=HISTORY_YEARS, today=None):
-    grid = _full_grid(days_by_date, years, today)
+    grid, start = _full_grid(days_by_date, years, today)
     # The markup has no data-count, only the already-bucketed data-level, so
     # this is the one derived stat available -- no invented precision.
     active_days = sum(1 for level in grid if level > 0)
-    return grid, active_days
+    # An abstract calendar cue for the bottom-margin ripple effect: the hue
+    # (0-359) for the OLDEST week currently in the grid, one full trip around
+    # the color wheel per year -- not literal seasons, just a consistent
+    # color-to-time-of-year association the eye can learn over repeated
+    # viewing. The firmware advances this per week on its own clock (see
+    # githubHueStepPerWeek) rather than the server sending one hue per week,
+    # so this single starting value is the only date info that crosses the
+    # wire.
+    base_hue = int((start.timetuple().tm_yday - 1) * 360 / 365) % 360
+    return grid, active_days, base_hue
 
 
 def fetch(username, years=HISTORY_YEARS):
@@ -233,34 +242,30 @@ def fetch(username, years=HISTORY_YEARS):
     if not days:
         raise GithubError('no contribution data for %s' % username)
 
-    grid, active_days = _grid_from_days(days, years, today)
-    # The grid's own last cell is the end of the *current calendar week*
-    # (Saturday), not today -- looking today up directly in the merged days
-    # dict is what actually answers "today's level".
-    today_level = days.get(today.isoformat(), 0)
+    grid, active_days, base_hue = _grid_from_days(days, years, today)
     return {'username': username, 'grid': grid, 'active_days': active_days,
-            'today_level': today_level}
+            'base_hue': base_hue}
 
 
 # --- Frame building ----------------------------------------------------------
 
-def build_frame(grid, brightness, stale=False, today_level=0):
+def build_frame(grid, brightness, stale=False, base_hue=0):
     """
     Produce the serial frame for one update.
 
-        <github,LLLLLLLL...L (grid chars, a multiple of 7),F,NNN,T>
+        <github,LLLLLLLL...L (grid chars, a multiple of 7),F,NNN,HHH>
 
-    L  contribution levels, one character per day, '0'-'4', flat index
-       week*7+day, oldest week first. Length varies with how many years of
-       history were fetched -- the firmware owns the scroll through however
-       much arrives.
-    F  flag bitfield; bit0 set means the data is stale
-    N  overall brightness, 5-255 as decimal
-    T  today's contribution level, '0'-'4' -- drives the breathing glow in
-       githubShow()'s reserved margin rows. Sent explicitly rather than
-       inferred from the grid's own last cell, because that cell is the end
-       of the current *calendar week* (Saturday), which is usually a future
-       date, not today.
+    L    contribution levels, one character per day, '0'-'4', flat index
+         week*7+day, oldest week first. Length varies with how many years of
+         history were fetched -- the firmware owns the scroll through
+         however much arrives.
+    F    flag bitfield; bit0 set means the data is stale
+    N    overall brightness, 5-255 as decimal
+    HHH  hue (0-359, zero-padded) for the OLDEST week in the grid -- an
+         abstract calendar cue for the ripple effect in githubShow()'s margin
+         rows, one full trip around the color wheel per year of history. The
+         firmware advances it per week on its own (githubHueStepPerWeek)
+         rather than the server sending one hue per week.
 
     No default for brightness -- the caller always supplies one, matching
     sprite_frame(layout, brightness)'s precedent in app.py.
@@ -270,10 +275,10 @@ def build_frame(grid, brightness, stale=False, today_level=0):
 
     series = ''.join(str(min(4, max(0, level))) for level in grid)
     flags = 1 if stale else 0
-    today_level = min(4, max(0, today_level))
+    base_hue = min(359, max(0, base_hue))
 
-    return '<github,%s,%d,%d,%d>' % (
-        series, flags, stock.normalize_brightness(brightness), today_level)
+    return '<github,%s,%d,%d,%03d>' % (
+        series, flags, stock.normalize_brightness(brightness), base_hue)
 
 
 def decode_frame(frame):
@@ -285,7 +290,7 @@ def decode_frame(frame):
     if len(parts) != 5 or parts[0] != 'github':
         raise ValueError('unexpected frame shape: %r' % (parts,))
 
-    series, flags, brightness, today_level = parts[1:5]
+    series, flags, brightness, base_hue = parts[1:5]
     if len(series) % GRID_DAYS != 0:
         raise ValueError(
             'grid length must be a multiple of %d days, got %d' % (GRID_DAYS, len(series)))
@@ -294,7 +299,7 @@ def decode_frame(frame):
         'grid': [int(c) for c in series],
         'stale': bool(int(flags) & 1),
         'brightness': int(brightness),
-        'today_level': int(today_level),
+        'base_hue': int(base_hue),
     }
 
 
@@ -443,7 +448,7 @@ class Poller(threading.Thread):
             try:
                 cache['cells'] = render_cells(build_frame(
                     cache['grid'], brightness, stale=cache['stale'],
-                    today_level=cache['today_level']))
+                    base_hue=cache['base_hue']))
             except (GithubError, ValueError):
                 cache['cells'] = None
         return {'data': cache, 'error': error, 'brightness': brightness}
@@ -479,10 +484,7 @@ class Poller(threading.Thread):
         if not days:
             raise GithubError('no contribution data for %s' % username)
 
-        grid, active_days = _grid_from_days(days, HISTORY_YEARS, today)
-        # Same reasoning as fetch(): the grid's own last cell is the end of
-        # the current calendar week (usually a future date), not today.
-        today_level = days.get(today.isoformat(), 0)
+        grid, active_days, base_hue = _grid_from_days(days, HISTORY_YEARS, today)
 
         with self._lock:
             self._historical_days = historical
@@ -490,7 +492,7 @@ class Poller(threading.Thread):
                 'username': username,
                 'grid': grid,
                 'active_days': active_days,
-                'today_level': today_level,
+                'base_hue': base_hue,
                 'fetched_at': time.time(),
             }
             self._error = None
@@ -498,7 +500,7 @@ class Poller(threading.Thread):
 
         # Only put a frame on the wire when it would actually change the wall.
         if force or self._is_active():
-            frame = build_frame(grid, self._get_brightness(), today_level=today_level)
+            frame = build_frame(grid, self._get_brightness(), base_hue=base_hue)
             if force or frame != self._last_frame:
                 self._send(frame)
                 self._last_frame = frame
@@ -517,7 +519,7 @@ class Poller(threading.Thread):
 
         frame = build_frame(cache['grid'], self._get_brightness(),
                             stale=self._is_stale(cache),
-                            today_level=cache['today_level'])
+                            base_hue=cache['base_hue'])
         self._send(frame)
         self._last_frame = frame
 
@@ -560,7 +562,7 @@ class Poller(threading.Thread):
         try:
             frame = build_frame(cache['grid'], self._get_brightness(),
                                 stale=self._is_stale(cache),
-                                today_level=cache['today_level'])
+                                base_hue=cache['base_hue'])
             if frame != self._last_frame:
                 self._send(frame)
                 self._last_frame = frame
@@ -582,8 +584,8 @@ def _preview(usernames):
             continue
 
         frame = build_frame(data['grid'], stock.DEFAULT_BRIGHTNESS,
-                            today_level=data['today_level'])
-        print('today: level %d' % data['today_level'])
+                            base_hue=data['base_hue'])
+        print('oldest week hue: %d' % data['base_hue'])
         print('frame (%d payload chars): %s' % (len(frame) - 2, frame))
         print(render_ascii(frame))
     return status
